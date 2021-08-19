@@ -1,0 +1,39 @@
+# Folders
+
+# Ignore Work in Progress
+**/*WIP
+
+# Media Files
+# *.png
+# *.jpg
+# *.bmp
+# *.tif
+# *.avi
+# *.mp4
+*.drawio
+
+# Documnets
+*.doc
+*.docx
+#*.pdf
+*.ppt
+*.pptx
+*.psd
+*.xls
+*.xlsx
+
+# MATLAB Files
+*.asv
+*.m~
+*.mat
+
+# Compilation files:
+*.obj
+*.pdb
+
+# Jupyter Files
+# See https://www.atlassian.com/git/tutorials/saving-changes/gitignore, https://stackoverflow.com/questions/8783093 and https://stackoverflow.com/a/36918878/195787
+**/.ipynb_checkpoints/
+
+# Output Figures Files
+Figure*.png
