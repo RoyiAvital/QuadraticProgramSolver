@@ -68,10 +68,12 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
     
     if (directSol)
         hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) transpose(mA); mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
+        vV  = zeros(numElementsX + numRowsA);
+        vT1 = @view vV[1:numElementsX];
+        vT2 = @view vV[(numElementsX + 1):end];
+    else
+        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
     end
-
-    mΡ = 1;
-    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
 
     for ii in 1:numIterations
         if (adptΡ && ((ρρ * fctrΡ < ρ) || (ρρ > fctrΡ * ρ)))
@@ -84,10 +86,15 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
             end
         end
         if (directSol)
-            vV = hDL \ [σ * vX - vQ; vZ - ρ¹ * vY];
+            # vV = hDL \ [σ * vX - vQ; vZ - ρ¹ * vY];
+            # ldiv!(vV, hDL, [σ * vX - vQ; vZ - ρ¹ * vY]);
+            @. vT1 = σ * vX - vQ;
+            @. vT2 = vZ - ρ¹ * vY;
+            ldiv!(hDl, vV);
             @. vXX = vV[1:numElementsX];
-            @. vZZ = vZ + ρ¹ * (vV[(numElementsX + 1):end] - vY);
+            @. vZZ = vZ + ρ¹ * (vT2 - vY);
         else
+            # No reason to set temporary array for the RHS vector as it has matrix multiplication (Will cause temporary at any way)
             cg!(vXX, mL, σ * vX - vQ + transpose(mA) * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
             mul!(vZZ, mA, vXX);
         end

@@ -55,7 +55,7 @@ Look inside the function `SolveQuadProgram()` and see the [reference paper][002]
 
 The unit tests implemented in `SolveQuadraticProgramUnitTest.m`.  
 The script requires [CVX](http://cvxr.com/) and [Optimization Toolbox][003].  
-IT basically generates a problem and verify the solution of `SolveQuadraticProgram()` vs. the other 2 references.
+It basically generates a problem and verify the solution of `SolveQuadraticProgram()` vs. the other 2 references.
 
 ## To Do
 
