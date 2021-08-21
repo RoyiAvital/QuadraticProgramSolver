@@ -39,6 +39,7 @@ problemClass    = rand(instances(ProblemClass));
 numIterations   = 450;
 ρ               = 1000000.01;
 adptΡ           = true;
+linSolverMode   = modeDirect;
 
 if (dataSource == dataSourceGenerated)
     mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints);
@@ -65,7 +66,7 @@ hPrblm = minimize(0.5 * quadform(vT, Matrix(mP)) + dot(vT, vQ), [vL <= Matrix(mA
 solve!(hPrblm, SCS.Optimizer(eps = 1e-8); silent_solver = true);
 
 # vX = copy(vT.value);
-convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ);
+convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ, linSolverMode = linSolverMode);
 
 maxAbsDev = norm(vT.value - vX, Inf);
 

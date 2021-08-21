@@ -15,24 +15,24 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
     ρ = 1e6, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ::Bool = false, 
     fctrΡ = 5, numItrPolish = 10, linSolverMode::LinearSolverMode = modeAuto,
     ϵPcg = 1e-9, numItrPcg = 15000, ϵMinres = 1e-6, numItrMinres = 500, numItrConv = 25)
-
+    
     numElementsX            = size(vX, 1);
     numRowsP, numColsP      = size(mP);
     numElementsQ            = size(vQ, 1);
     numRowsA, numColsA      = size(mA);
     numElementsL            = size(vL, 1);
     numElementsU            = size(vU, 1);
-
+    
     # TODO: Numbers should be optimized
     MAX_NUM_ROWS_L  = 5000;
     MAX_DENSITY     = 0.4;
     
     MIN_VAL_Ρ = 1e-3;
     MAX_VAL_Ρ = 1e6;
-
+    
     ρ¹ = 1 / ρ;
     α¹ = 1 - α;
-
+    
     if (linSolverMode == modeItertaive)
         directSol = false;
     elseif (linSolverMode == modeDirect)
@@ -47,17 +47,21 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
             directSol = false;
         end
     end
-
+    
     convFlag    = convNumItr;
     ϵAdmm       = min(ϵAbs, ϵRel) * 1e-2;
-
+    
     vXX = copy(vX);
     vXP = zeros(numElementsX); #<! Previous iteration of vX
     vZ  = zeros(numRowsA);
     vY  = zeros(numRowsA);
     vZZ = zeros(numRowsA);
     vZP = zeros(numRowsA); #<! Previous iteration of vZ
-
+    
+    vV  = zeros(numElementsX + numRowsA);
+    vT1 = @view vV[1:numElementsX];
+    vT2 = @view vV[(numElementsX + 1):end];
+    
     if (adptΡ)
         # ̂ρ = ρ; #<! Won't work
         ρρ = ρ;
@@ -68,13 +72,10 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
     
     if (directSol)
         hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) transpose(mA); mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
-        vV  = zeros(numElementsX + numRowsA);
-        vT1 = @view vV[1:numElementsX];
-        vT2 = @view vV[(numElementsX + 1):end];
     else
         mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
     end
-
+    
     for ii in 1:numIterations
         if (adptΡ && ((ρρ * fctrΡ < ρ) || (ρρ > fctrΡ * ρ)))
             ρ   = ρρ;
@@ -87,25 +88,30 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
         end
         if (directSol)
             # vV = hDL \ [σ * vX - vQ; vZ - ρ¹ * vY];
-            # ldiv!(vV, hDL, [σ * vX - vQ; vZ - ρ¹ * vY]);
+            # @. vXX = vV[1:numElementsX];
+            # @. vZZ = vZ + ρ¹ * (vV[(numElementsX + 1):end] - vY);
             @. vT1 = σ * vX - vQ;
             @. vT2 = vZ - ρ¹ * vY;
-            ldiv!(hDl, vV);
+            # ldiv!(hDL, vV); #<! No support in SuiteSparse
+            vV .= hDL \ vV; #<! Like copy!() / copyto!()
             @. vXX = vV[1:numElementsX];
             @. vZZ = vZ + ρ¹ * (vT2 - vY);
         else
-            # No reason to set temporary array for the RHS vector as it has matrix multiplication (Will cause temporary at any way)
-            cg!(vXX, mL, σ * vX - vQ + transpose(mA) * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
+            @. vT2 = ρ * vZ - vY;
+            mul!(vT1, transpose(mA), vT2);
+            @. vT1 = σ * vX - vQ + vT1;
+            cg!(vXX, mL, vT1, abstol = ϵPcg, maxiter = numItrPcg);
+            # cg!(vXX, mL, σ * vX - vQ + transpose(mA) * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
             mul!(vZZ, mA, vXX);
         end
-
+        
         copyto!(vXP, vX);
         @. vX = α * vXX + α¹ * vX;
-
+        
         copyto!(vZP, vZ);
         @. vZ = clamp(α * vZZ + α¹ * vZ + ρ¹ * vY, vL, vU); #<! Projection
         @. vY = vY + ρ * (α * vZZ + α¹ * vZP - vZ);
-
+        
         if (mod(ii, numItrConv) == 0)
             # Pre Computation
             normResPrim = norm(mA * vX - vZ, Inf);
@@ -120,6 +126,7 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
                 denominatorVal  = normResDual * maxNormPrim;
                 ρρ              = clamp(ρ * sqrt(numeratorVal / denominatorVal), MIN_VAL_Ρ, MAX_VAL_Ρ);
             end
+            
             # Termination
             epsPrim = ϵAbs + ϵRel * maxNormPrim;
             epsDual = ϵAbs + ϵRel * maxNormDual;
@@ -133,10 +140,10 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
                 break;
             end
         end
-
+        
     end
-
+    
     return convFlag;
-
-
+    
+    
 end
