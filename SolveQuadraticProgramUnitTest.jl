@@ -8,18 +8,18 @@ using SCS
 # using Gurobi
 using Plots
 using Random
+using StableRNGs
 using MAT
 
-# For manual Gurobi installation
-# ENV["GUROBI_HOME"] = "D:\\Applications\\Gurobi"
-# ENV["GRB_LICENSE_FILE"] = "D:\\Applications\\Gurobi\\gurobi.lic"
 
-# Random.seed!(1234);
+seedNumber = 1234;
+# Random.seed!(seedNumber);
+Random.seed!(StableRNG(seedNumber), seedNumber);
 
 include("GenerateQuadraticProgram.jl");
 include("SolveQuadraticProgram.jl");
 
-@enum ProblemClass randomQp equalityConstrainedQp optimalControl portfolioOptimization lassoOptimization huberFitting supportVectorMachine
+# @enum ProblemClass randomQp = 1 inequalityConstrainedQp equalityConstrainedQp optimalControl portfolioOptimization lassoOptimization huberFitting supportVectorMachine isotonicRegression
 @enum DataSource dataSourceGenerated = 1 dataSourceLoaded
 
 ## Parameters
@@ -33,13 +33,13 @@ dataSource      = dataSourceGenerated;
 dataFileName    = "QpModel.mat";
 
 problemClass    = rand(instances(ProblemClass));
-# problemClass    = equalityConstrainedQp;
+# problemClass    = randomQp;
 
 # Solver
 numIterations   = 450;
 ρ               = 1000000.01;
 adptΡ           = true;
-linSolverMode   = modeDirect;
+linSolverMode   = modeItertaive;
 
 if (dataSource == dataSourceGenerated)
     mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints);
@@ -63,7 +63,7 @@ fObjFun(vX) = 0.5 * dot(vX, mP, vX) + dot(vQ, vX);
 # Reference: Convex Solver
 vT = Variable(numElements);
 hPrblm = minimize(0.5 * quadform(vT, Matrix(mP)) + dot(vT, vQ), [vL <= Matrix(mA) * vT, Matrix(mA) * vT <= vU]);
-solve!(hPrblm, SCS.Optimizer(eps = 1e-8); silent_solver = true);
+Convex.solve!(hPrblm, SCS.Optimizer(eps = 1e-8); silent_solver = true);
 
 # vX = copy(vT.value);
 convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ, linSolverMode = linSolverMode);
