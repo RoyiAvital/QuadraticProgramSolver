@@ -70,7 +70,7 @@ function [ mP, vQ, mA, vL, vU ] = GenerateQP( problemClass, numElements, numCons
 % ----------------------------------------------------------------------------------------------- %
 
 arguments
-    problemClass (1, 1) {mustBeNumeric, mustBeReal, mustBePositive, mustBeMember(problemClass, [1:9])} = 1
+    problemClass (1, 1) {mustBeNumeric, mustBeReal, mustBePositive, mustBeMember(problemClass, [1:8])} = 1
     numElements (1, 1) {mustBeNumeric, mustBeReal, mustBePositive, mustBeInteger} = 100
     numConstraints (1, 1) {mustBeNumeric, mustBeReal, mustBePositive, mustBeInteger} = 50
 end
@@ -81,17 +81,17 @@ OFF     = 0;
 ON      = 1;
 
 PROBLEM_CLASS_RADNOM_QP                 = 1;
+PROBLEM_CLASS_INEQUALITY_CONSTRAINED_QP = 2;
 PROBLEM_CLASS_EQUALITY_CONSTRAINED_QP   = 2;
 PROBLEM_CLASS_OPTIMAL_CONTROL           = 3;
 PROBLEM_CLASS_PORTFOLIO_OPTIMIZATION    = 4;
 PROBLEM_CLASS_LASSO_OPTIMIZATION        = 5;
 PROBLEM_CLASS_HUBBER_FITTING            = 6;
 PROBLEM_CLASS_SUPPORT_VECTOR_MACHINE    = 7;
-PROBLEM_CLASS_RANDOM_QP_WITH_EQL_CONS   = 8;
-PROBLEM_CLASS_ISOTONIC_REGRESSION       = 9;
+PROBLEM_CLASS_ISOTONIC_REGRESSION       = 8;
 
 switch(problemClass)
-    case({PROBLEM_CLASS_RADNOM_QP, PROBLEM_CLASS_EQUALITY_CONSTRAINED_QP, PROBLEM_CLASS_RANDOM_QP_WITH_EQL_CONS})
+    case({PROBLEM_CLASS_RADNOM_QP, PROBLEM_CLASS_INEQUALITY_CONSTRAINED_QP, PROBLEM_CLASS_EQUALITY_CONSTRAINED_QP})
         densityFctr = 0.15;
         paramAlpha  = 1e-2;
         
@@ -100,7 +100,7 @@ switch(problemClass)
         vQ = randn(numElements, 1);
         
         mA = sprandn(numConstraints, numElements, densityFctr);
-        if(problemClass == PROBLEM_CLASS_RADNOM_QP)
+        if(problemClass == PROBLEM_CLASS_INEQUALITY_CONSTRAINED_QP)
             vL = -rand(numConstraints, 1);
             vU = rand(numConstraints, 1);
         elseif(problemClass == PROBLEM_CLASS_EQUALITY_CONSTRAINED_QP)
