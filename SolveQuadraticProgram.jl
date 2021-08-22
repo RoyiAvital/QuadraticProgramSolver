@@ -67,13 +67,13 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
         ρρ = ρ;
         
         mAA = transpose(mA) * mA;
-        mPI = mP + (σ * sparse(I, numElementsX, numElementsX));    
+        mPI = mP + sparse(σ * I, numElementsX, numElementsX);
     end
     
     if (directSol)
-        hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) transpose(mA); mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
+        hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) transpose(mA); mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
     else
-        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+        mL = mP + sparse(σ * I, numElementsX, numElementsX) + (ρ * (transpose(mA) * mA));
     end
     
     for ii in 1:numIterations
@@ -81,7 +81,7 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
             ρ   = ρρ;
             ρ¹  = 1 / ρ;
             if (directSol)
-                hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) transpose(mA); mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
+                hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) transpose(mA); mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
             else
                 mL = mPI + (ρ * mAA);
             end
@@ -100,7 +100,7 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
             @. vT2 = ρ * vZ - vY;
             mul!(vT1, transpose(mA), vT2);
             @. vT1 = σ * vX - vQ + vT1;
-            cg!(vXX, mL, vT1, abstol = ϵPcg, maxiter = numItrPcg);
+            IterativeSolvers.cg!(vXX, mL, vT1, abstol = ϵPcg, maxiter = numItrPcg);
             # cg!(vXX, mL, σ * vX - vQ + transpose(mA) * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
             mul!(vZZ, mA, vXX);
         end
