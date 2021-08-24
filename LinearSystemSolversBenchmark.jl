@@ -15,21 +15,17 @@ Random.seed!(1234);
 include("GenerateQuadraticProgram.jl");
 include("LinearSystemSolvers.jl");
 
-@enum ProblemClass randomQp equalityConstrainedQp optimalControl portfolioOptimization lassoOptimization huberFitting supportVectorMachine
-
 ## Parameters
 
 # Simulaion
-numSimulations  = 500;
 numElements     = 250;
-numConstraints  = 2;
+numConstraints  = 20;
 
 # problemClass    = rand(instances(ProblemClass));
 problemClass    = randomQp;
 
-
 ## Generating Model
-mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints);
+mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints = numConstraints);
 
 
 # Some problems might change the actual data
@@ -50,7 +46,7 @@ vV = randn(numElements + numConstraints);
 
 # @benchmark LaLdlt!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 1e-6, ρ = 1e6, σ = 1e-6);
 # @benchmark ItrSolCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
-# @benchmark KrylovCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
+@benchmark KrylovCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
 # @benchmark KrylovCr!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
 # @benchmark KrylovCgLanczos!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
 # @benchmark LinOpCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);

@@ -5,16 +5,20 @@ using SparseArrays
 using Convex
 using SCS
 # using ECOS #<! Seems to be very inaccurate for this problem
-# using Gurobi
+using Gurobi
 using Plots
 using Random
 using StableRNGs
 using MAT
 
+# For manual Gurobi installation
+ENV["GUROBI_HOME"] = "D:\\Applications\\Gurobi"
+ENV["GRB_LICENSE_FILE"] = "D:\\Applications\\Gurobi\\gurobi.lic"
+
 
 seedNumber = 1234;
-# Random.seed!(seedNumber);
-Random.seed!(StableRNG(seedNumber), seedNumber);
+Random.seed!(seedNumber);
+# Random.seed!(StableRNG(seedNumber), seedNumber);
 
 include("GenerateQuadraticProgram.jl");
 include("SolveQuadraticProgram.jl");
@@ -26,23 +30,23 @@ include("SolveQuadraticProgram.jl");
 
 # Simulaion
 numSimulations  = 10;
-numElements     = 100;
-numConstraints  = 50;
+numElements     = 50;
+numConstraints  = 0; #<! Set to 0 for OSQP Paper dimensions
 
 dataSource      = dataSourceGenerated;
 dataFileName    = "QpModel.mat";
 
-problemClass    = rand(instances(ProblemClass));
-# problemClass    = randomQp;
+# problemClass    = rand(instances(ProblemClass));
+problemClass    = isotonicRegression;
 
 # Solver
-numIterations   = 450;
-ρ               = 1000000.01;
+numIterations   = 5000;
+ρ               = 1e6
 adptΡ           = true;
-linSolverMode   = modeItertaive;
+linSolverMode   = modeDirect;
 
 if (dataSource == dataSourceGenerated)
-    mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints);
+    mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements; numConstraints = numConstraints);
 else
     dMatFile = matread(dataFileName); 
     mP = dMatFile["mP"];
@@ -63,14 +67,19 @@ fObjFun(vX) = 0.5 * dot(vX, mP, vX) + dot(vQ, vX);
 # Reference: Convex Solver
 vT = Variable(numElements);
 hPrblm = minimize(0.5 * quadform(vT, Matrix(mP)) + dot(vT, vQ), [vL <= Matrix(mA) * vT, Matrix(mA) * vT <= vU]);
-Convex.solve!(hPrblm, SCS.Optimizer(eps = 1e-8); silent_solver = true);
+# runTimeCvx = @elapsed Convex.solve!(hPrblm, SCS.Optimizer(eps = 1e-8); silent_solver = true);
+# Gurobi Parameters: https://www.gurobi.com/documentation/9.1/refman/parameters.html
+runTimeCvx = @elapsed Convex.solve!(hPrblm, Gurobi.Optimizer(OptimalityTol = 1e-8, FeasibilityTol = 1e-8); silent_solver = false);
 
 # vX = copy(vT.value);
-convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ, linSolverMode = linSolverMode);
+runTime = @elapsed convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ, linSolverMode = linSolverMode);
 
 maxAbsDev = norm(vT.value - vX, Inf);
 
-display(scatter([vX, vT.value], title = "Max Absolute Deviation: $(maxAbsDev)", label = ["Solver" "Reference"]));
-display(scatter([mA * vT.value, vL, vU], label = ["Solver" "Lower Boundary" "Upper Boundary"]));
+display(scatter([vX, vT.value], title = "Solver Solution\nMax Absolute Deviation: $(maxAbsDev)\nRun Time: $(runTime) [Sec], Solver Mode: $(linSolverMode)", label = ["Solver" "Reference"]));
+display(scatter([mA * vT.value, vL, vU], title = "Constraints Map", label = ["Solver" "Lower Boundary" "Upper Boundary"]));
 
-println(maxAbsDev)
+println("The max absolute error is: $(maxAbsDev)");
+println("The run time is: $(runTime) [Sec]");
+println("The output flag is: $(convFlag)");
+println("The Convex.jl run time is: $(runTimeCvx) [Sec]");

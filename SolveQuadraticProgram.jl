@@ -74,6 +74,7 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
         hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) transpose(mA); mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
     else
         mL = mP + sparse(σ * I, numElementsX, numElementsX) + (ρ * (transpose(mA) * mA));
+        # sCgSolver = Krylov.CgSolver(numElementsX, numElementsX, typeof(vX)); #<! For Krylov based
     end
     
     for ii in 1:numIterations
