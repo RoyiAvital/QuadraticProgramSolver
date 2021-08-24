@@ -74,9 +74,12 @@ function KrylovCg!(vX, mP, mA, vV;
     for ii in 1:(numFactor - 1)
         mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
     end
+
+    sCgSolver = Krylov.CgSolver(mL, vX);
     
     for ii in 1:numIterations
-        vT, _ = Krylov.cg(mL, vX, atol = ϵSolver, itmax = numItrSolver);
+        # vT, _ = Krylov.cg(mL, vX, atol = ϵSolver, itmax = numItrSolver);
+        vT, _ = Krylov.cg!(sCgSolver, mL, vX, atol = ϵSolver, itmax = numItrSolver);
         vX .= vT;
     end
     
