@@ -5,7 +5,7 @@ using SparseArrays
 using Convex
 using SCS
 # using ECOS #<! Seems to be very inaccurate for this problem
-using Gurobi
+using Gurobi #<! Solves problems which SCS struggles with
 using Plots
 using Random
 using StableRNGs

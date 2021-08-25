@@ -11,7 +11,6 @@ using BenchmarkTools
 BenchmarkTools.DEFAULT_PARAMETERS.samples = 5;
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 10;
 
-
 seedNumber = 1234;
 Random.seed!(seedNumber);
 # Random.seed!(StableRNG(seedNumber), seedNumber);
@@ -32,7 +31,7 @@ dataSource      = dataSourceGenerated;
 dataFileName    = "QpModel.mat";
 
 # problemClass    = rand(instances(ProblemClass));
-problemClass    = randomQp;
+problemClass    = isotonicRegression;
 
 # Solver
 numIterations   = 5000;
@@ -55,10 +54,8 @@ end
 numElements     = size(mP, 1);
 numConstraints  = size(mA, 1);
 
-vX = zeros(numElements);
+vXX = zeros(numElements);
 
-
-# vX = copy(vT.value);
-# sBenchMark = @benchmark convFlag = SolveQuadraticProgram!($vX, $mP, $vQ, $mA, $vL, $vU; numIterations = $numIterations, ρ = $ρ, adptΡ = $adptΡ, linSolverMode = $linSolverMode);
-# display(plot(sBenchMark));
-# println(convFlag);
+sBenchMark = @benchmark convFlag = SolveQuadraticProgram!($vX, $mP, $vQ, $mA, $vL, $vU; numIterations = $numIterations, ρ = $ρ, adptΡ = $adptΡ, linSolverMode = $linSolverMode); setup = (vX .= $vXX);
+display(sBenchMark);
+println(convFlag);
