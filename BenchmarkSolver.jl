@@ -4,21 +4,25 @@ using BenchmarkTools
 
 include("GenerateQuadraticProgram.jl");
 
-BenchmarkTools.DEFAULT_PARAMETERS.samples = 5;
-BenchmarkTools.DEFAULT_PARAMETERS.seconds = 100;
+# const BENCHMARK_NUM_SAMPLES = 10;
+# const BENCHMARK_NUM_EVALS   = 1;
+# const BENCHMARK_RUN_TIME    = 90;
 
-function BenchmarkSolver(solverFun, problemClass::ProblemClass; numElementsMin = 20, numElementsMax = 2000, numConstraintsMin = 10, numConstraintsMax = 1000, numDims = 5, logSpace = true)
-    
+function GenerateElementsVector(numElementsMin = 20, numElementsMax = 2000; logSpace = true)
     if (logSpace)
         # Log Scale: More data points in the high values
-        vNumElements    = round.(Int, 10 .^ (LinRange(log10(numElementsMin), log10(numElementsMax), numDims)));
-        vNumConstraints =  round.(Int, 10 .^ (LinRange(log10(numConstraintsMin), log10(numConstraintsMax), numDims)));
+        vNumElements = round.(Int, 10 .^ (LinRange(log10(numElementsMin), log10(numElementsMax), numDims)));
     else
-        vNumElements    = round.(Int, LinRange(numElementsMin, numElementsMax, numDims));
-        vNumConstraints = round.(Int, LinRange(numConstraintsMin, numConstraintsMax, numDims));
+        vNumElements = round.(Int, LinRange(numElementsMin, numElementsMax, numDims));
     end
+
+    return vNumElements;
+end
+
+function BenchmarkSolver(solverFun, problemClass::ProblemClass, vNumElements, vNumConstraints; benchMarkSamples = 10, benchMarkEvals = 1, benchMarkSeconds = 90)
     
-    mR = Matrix{Float64}(undef, numDims, 3); #<! Time [Nano Sec], Number of Allocations, Allocations Size
+    # mR = Matrix{Float64}(undef, numDims, 5); #<! Min Time [Nano Sec], Median Time [Nano Sec], Max Time [Nano Sec], Number of Allocations, Allocations Size
+    cBenchMark = Array{Any}(undef, numDims);
     
     for ii in 1:numDims
         mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, vNumElements[ii], numConstraints = vNumConstraints[ii]);
@@ -28,13 +32,11 @@ function BenchmarkSolver(solverFun, problemClass::ProblemClass; numElementsMin =
 
         vXX = zeros(numElements);
 
-        sBenchMark = @benchmark solverFun(vX, $mP, $vQ, $mA, $vL, $vU) setup = (vX = copy($vXX););
-        mR[ii, 1] = min(sBenchMark.times...); #<! Minimum Running Time [Nano Sec]
-        mR[ii, 2] = sBenchMark.allocs; #<! Number of allocations
-        mR[ii, 3] = sBenchMark.memory; #<! Allocation Size [Bytes]
+        sBenchMark = @benchmarkable $solverFun(vX, $mP, $vQ, $mA, $vL, $vU) setup = (vX = copy($vXX)); #<! We must interpolate the function as it is not in the global scope
+        cBenchMark[ii] = run(sBenchMark, samples = benchMarkSamples, evals = benchMarkEvals, seconds = benchMarkSeconds);
     end
     
-    return mR, vNumElements, vNumConstraints;
+    return cBenchMark;
     
     
 end
