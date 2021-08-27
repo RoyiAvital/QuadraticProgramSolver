@@ -1,7 +1,9 @@
 
-using LinearAlgebra
-using SparseArrays
-using IterativeSolvers
+using LinearAlgebra;
+using SparseArrays;
+using IterativeSolvers;
+using MKLSparse; #<! Impportant for the Iterative Solver (Much faster sparseMat * denseVec)
+using LinearOperators;
 
 # using Parameters #<! Might help with packing / unpacking of parameters
 
@@ -66,15 +68,19 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
         # ̂ρ = ρ; #<! Won't work
         ρρ = ρ;
         
-        mAA = transpose(mA) * mA;
+        mAA = mA' * mA;
         mPI = mP + sparse(σ * I, numElementsX, numElementsX);
     end
     
     if (directSol)
-        hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) transpose(mA); mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
+        hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) mA'; mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
     else
-        mL = mP + sparse(σ * I, numElementsX, numElementsX) + (ρ * (transpose(mA) * mA));
+        mL = mP + sparse(σ * I, numElementsX, numElementsX) + (ρ * (mA' * mA));
         # sCgSolver = Krylov.CgSolver(numElementsX, numElementsX, typeof(vX)); #<! For Krylov based
+        # mL = LinearOperator(Float64, numElements, numElements, true, true, (vU, vW, α, β) -> begin
+        #         mul!(vU, mAA, vW);
+        #         mul!(vU, mPI, vW, one(Float64), ρ);
+        #     end);
     end
     
     for ii in 1:numIterations
@@ -82,9 +88,13 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
             ρ   = ρρ;
             ρ¹  = 1 / ρ;
             if (directSol)
-                hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) transpose(mA); mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
+                hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) mA'; mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
             else
                 mL = mPI + (ρ * mAA);
+            #     mL = LinearOperator(Float64, numElements, numElements, true, true, (vU, vW, α, β) -> begin
+            #     mul!(vU, mAA, vW);
+            #     mul!(vU, mPI, vW, one(Float64), ρ);
+            # end);
             end
         end
         if (directSol)
@@ -99,10 +109,10 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
             @. vZZ = vZ + ρ¹ * (vT2 - vY);
         else
             @. vT2 = ρ * vZ - vY;
-            mul!(vT1, transpose(mA), vT2);
+            mul!(vT1, mA', vT2);
             @. vT1 = σ * vX - vQ + vT1;
             IterativeSolvers.cg!(vXX, mL, vT1, abstol = ϵPcg, maxiter = numItrPcg);
-            # cg!(vXX, mL, σ * vX - vQ + transpose(mA) * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
+            # cg!(vXX, mL, σ * vX - vQ + mA' * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
             mul!(vZZ, mA, vXX);
         end
         
@@ -116,10 +126,10 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
         if (mod(ii, numItrConv) == 0)
             # Pre Computation
             normResPrim = norm(mA * vX - vZ, Inf);
-            normResDual = norm(mP * vX + vQ + transpose(mA) * vY, Inf);
+            normResDual = norm(mP * vX + vQ + mA' * vY, Inf);
             
             maxNormPrim = max(norm(mA * vX, Inf), norm(vZ, Inf));
-            maxNormDual = max(norm(mP * vX, Inf), norm(transpose(mA) * vY, Inf), norm(vQ, Inf));
+            maxNormDual = max(norm(mP * vX, Inf), norm(mA' * vY, Inf), norm(vQ, Inf));
             
             # Adaptive Rho
             if (adptΡ)
