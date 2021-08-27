@@ -12,7 +12,7 @@ function GenerateRandomQP(problemClass::ProblemClass, numElements::Int64 = 1000;
         α           = 1e-2;
 
         mM = sprandn(numElements, numElements, densityFctr);
-        mP = transpose(mM) * mM + sparse(α * I, numElements, numElements);        
+        mP = (mM' * mM) + sparse(α * I, numElements, numElements);        
         vQ = randn(numElements);
         if (problemClass == inequalityConstrainedQp)
             numConstraints ≠ 0 || (numConstraints = 10 * numElements);
@@ -42,7 +42,7 @@ function GenerateRandomQP(problemClass::ProblemClass, numElements::Int64 = 1000;
         mP = [mD spzeros(numElements, numConstraints); spzeros(numConstraints, numElements) sparse(I, numConstraints, numConstraints)];
         vQ = [randn(numElements); zeros(numConstraints)];
         mF = sprandn(numElements, numConstraints, densityFctr);
-        mA = [transpose(mF) sparse(-I, numConstraints, numConstraints); ones(1, numElements) spzeros(1, numConstraints); sparse(I, numElements, numElements) spzeros(numElements, numConstraints)];
+        mA = [mF' sparse(-I, numConstraints, numConstraints); ones(1, numElements) spzeros(1, numConstraints); sparse(I, numElements, numElements) spzeros(numElements, numConstraints)];
         vL = [zeros(numConstraints); 1; zeros(numElements)];
         vU = [zeros(numConstraints); 1; ones(numElements)];
     elseif (problemClass == lassoOptimization)
@@ -95,7 +95,7 @@ function GenerateRandomQP(problemClass::ProblemClass, numElements::Int64 = 1000;
         α           = 1e-2;
 
         mM = sprandn(numElements, numElements, densityFctr);
-        mP = transpose(mM) * mM + sparse(α * I, numElements, numElements);
+        mP = (mM' * mM) + sparse(α * I, numElements, numElements);
         vQ = randn(numElements);
         
         if (rand() >= 0.5)
