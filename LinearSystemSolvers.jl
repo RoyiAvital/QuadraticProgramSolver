@@ -1,13 +1,12 @@
 
-using LinearAlgebra
-using SparseArrays
-using IterativeSolvers
-using Krylov
-using LinearOperators
+using LinearAlgebra;
+using SparseArrays;
+using IterativeSolvers;
+using Krylov;
+using LinearOperators;
 
-function LaLdlt!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function LaLdlt!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Direct Solver using Base LDLT
     
@@ -17,10 +16,10 @@ function LaLdlt!(vX, mP, mA, vV;
     
     ρ¹ = 1 / ρ;
     
-    hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) transpose(mA); mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
+    hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) mA'; mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
     
     for ii in 1:(numFactor - 1)
-        hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) transpose(mA); mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
+        hDL = ldlt([mP + (σ * sparse(I, numElementsX, numElementsX)) mA'; mA -ρ¹ * sparse(I, numRowsA, numRowsA)]);
     end
     
     for ii in 1:numIterations
@@ -31,9 +30,8 @@ function LaLdlt!(vX, mP, mA, vV;
     
 end
 
-function ItrSolCg!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function ItrSolCg!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -43,23 +41,22 @@ function ItrSolCg!(vX, mP, mA, vV;
     
     ρ¹ = 1 / ρ;
     
-    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     
     for ii in 1:(numFactor - 1)
-        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     end
     
     for ii in 1:numIterations
-        IterativeSolvers.cg!(vX, mL, vX, abstol = ϵSolver, maxiter = numItrSolver);
+        IterativeSolvers.cg!(vX, mL, vX, abstol = ϵSolver, maxiter = numItrSolver); #<! Also compatible with LinearOperators
     end
     
     
 end
 
 
-function KrylovCg!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function KrylovCg!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -69,10 +66,10 @@ function KrylovCg!(vX, mP, mA, vV;
     
     ρ¹ = 1 / ρ;
     
-    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     
     for ii in 1:(numFactor - 1)
-        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     end
 
     sCgSolver = Krylov.CgSolver(mL, vX);
@@ -87,9 +84,8 @@ function KrylovCg!(vX, mP, mA, vV;
 end
 
 
-function KrylovCr!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function KrylovCr!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -99,10 +95,10 @@ function KrylovCr!(vX, mP, mA, vV;
     
     ρ¹ = 1 / ρ;
     
-    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     
     for ii in 1:(numFactor - 1)
-        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     end
     
     for ii in 1:numIterations
@@ -114,9 +110,8 @@ function KrylovCr!(vX, mP, mA, vV;
 end
 
 
-function KrylovCgLanczos!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function KrylovCgLanczos!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -126,10 +121,10 @@ function KrylovCgLanczos!(vX, mP, mA, vV;
     
     ρ¹ = 1 / ρ;
     
-    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+    mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     
     for ii in 1:(numFactor - 1)
-        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (transpose(mA) * mA));
+        mL = mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA));
     end
     
     for ii in 1:numIterations
@@ -141,9 +136,8 @@ function KrylovCgLanczos!(vX, mP, mA, vV;
 end
 
 
-function LinOpCg!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function LinOpCg!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -158,7 +152,7 @@ function LinOpCg!(vX, mP, mA, vV;
     vT = zeros(numRowsA); #<! Buffer
     opL = LinearOperator(Float64, numElements, numElements, true, true, (vU, vW, α, β) -> begin
     mul!(vT, mA, vW);
-    mul!(vU, transpose(mA), vT);
+    mul!(vU, mA', vT);
     mul!(vU, mP, vW, one(Float64), ρ);
     vU .= vU .+ (σ .* vW);
 end);
@@ -166,7 +160,7 @@ end);
 for ii in 1:(numFactor - 1)
     opL = LinearOperator(Float64, numElements, numElements, true, true, (vU, vW, α, β) -> begin
         mul!(vT, mA, vW);
-        mul!(vU, transpose(mA), vT);
+        mul!(vU, mA', vT);
         mul!(vU, mP, vW, one(Float64), ρ);
         vU .= vU .+ (σ .* vW);
     end);
@@ -181,9 +175,8 @@ end
 end
 
 
-function KrylovTriCg!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function KrylovTriCg!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -206,7 +199,7 @@ function KrylovTriCg!(vX, mP, mA, vV;
     end
     
     for ii in 1:numIterations
-        vXX, vVV, _ = tricg(transpose(mA), vX, vVV; M = mM, N = mN, atol = ϵSolver, itmax = numItrSolver);
+        vXX, vVV, _ = tricg(mA', vX, vVV; M = mM, N = mN, atol = ϵSolver, itmax = numItrSolver);
         vX .= vXX;
     end
     
@@ -214,9 +207,8 @@ function KrylovTriCg!(vX, mP, mA, vV;
 end
 
 
-function KrylovTriMr!(vX, mP, mA, vV;
-    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500,
-    ρ = 1e6, σ = 1e-6)
+function KrylovTriMr!(vX, mP, mA, vV, ρ = 1e6, σ = 1e-6;
+    numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500)
     
     # Iterative Solver using IterativeSolver cg!()
     
@@ -239,7 +231,7 @@ function KrylovTriMr!(vX, mP, mA, vV;
     end
     
     for ii in 1:numIterations
-        vXX, vVV, _ = trimr(transpose(mA), vX, vVV; M = mM, N = mN, atol = ϵSolver, itmax = numItrSolver);
+        vXX, vVV, _ = trimr(mA', vX, vVV; M = mM, N = mN, atol = ϵSolver, itmax = numItrSolver);
         vX .= vXX;
     end
     

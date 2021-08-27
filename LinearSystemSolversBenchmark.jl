@@ -26,14 +26,28 @@ problemClass    = randomQp;
 
 ## Generating Model
 mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints = numConstraints);
+ρ = 1e6;
+σ = 1e-6;
+
+# Solver Parameters
+numFactor       = 3;
+numIterations   = 50;
+ϵSolver         = 1e-6;
+numItrSolver    = 1e-6;
 
 
 # Some problems might change the actual data
 numElements     = size(mP, 1);
 numConstraints  = size(mA, 1);
 
-vX = zeros(numElements);
+vX = randn(numElements);
 vV = randn(numElements + numConstraints);
+
+currTime    = time();
+vXRef       = (mP + (σ * sparse(I, numElementsX, numElementsX)) + (ρ * (mA' * mA))) \ vX;
+runTime     = time() - currTime;
+
+println("\The Reference Run Time: $runTime [Sec]");
 
 # LaLdlt!(vX, mP, mA, vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 1e-6, ρ = 1e6, σ = 1e-6);
 # ItrSolCg!(vX, mP, mA, vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
@@ -46,7 +60,7 @@ vV = randn(numElements + numConstraints);
 
 # @benchmark LaLdlt!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 1e-6, ρ = 1e6, σ = 1e-6);
 # @benchmark ItrSolCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
-@benchmark KrylovCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
+# @benchmark KrylovCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
 # @benchmark KrylovCr!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
 # @benchmark KrylovCgLanczos!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
 # @benchmark LinOpCg!($vX, $mP, $mA, $vV; numFactor = 3, numIterations = 50, ϵSolver = 1e-6, numItrSolver = 500, ρ = 1e6, σ = 1e-6);
