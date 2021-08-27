@@ -91,10 +91,10 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
                 hDL = ldlt([mP + sparse(σ * I, numElementsX, numElementsX) mA'; mA sparse(-ρ¹ * I, numRowsA, numRowsA)]);
             else
                 mL = mPI + (ρ * mAA);
-            #     mL = LinearOperator(Float64, numElements, numElements, true, true, (vU, vW, α, β) -> begin
-            #     mul!(vU, mAA, vW);
-            #     mul!(vU, mPI, vW, one(Float64), ρ);
-            # end);
+                #     mL = LinearOperator(Float64, numElements, numElements, true, true, (vU, vW, α, β) -> begin
+                #     mul!(vU, mAA, vW);
+                #     mul!(vU, mPI, vW, one(Float64), ρ);
+                # end);
             end
         end
         if (directSol)
@@ -156,5 +156,142 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
     
     return convFlag;
     
+    
+end
+
+
+function SolveQuadraticProgramModular!(vX, mP, vQ, mA, vL, vU;
+    numIterations = 5000, ϵAbs = 1e-6, ϵRel = 1e-6,
+    ρ = 1e6, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ::Bool = false, 
+    fctrΡ = 5, numItrPolish = 10, linSolverMode::LinearSolverMode = modeAuto,
+    ϵPcg = 1e-9, numItrPcg = 15000, ϵMinres = 1e-6, numItrMinres = 500, numItrConv = 25)
+    
+    numElementsX            = size(vX, 1);
+    numRowsP, numColsP      = size(mP);
+    numElementsQ            = size(vQ, 1);
+    numRowsA, numColsA      = size(mA);
+    numElementsL            = size(vL, 1);
+    numElementsU            = size(vU, 1);
+    
+    # TODO: Numbers should be optimized
+    MAX_NUM_ROWS_L  = 5000;
+    MAX_DENSITY     = 0.4;
+    
+    ρ¹ = 1 / ρ;
+    α¹ = 1 - α;
+    
+    convFlag    = convNumItr;
+    ϵAdmm       = min(ϵAbs, ϵRel) * 1e-2;
+
+    vXX, vZZ, tuSolver = LinearSystemSolverLdlInit(vX, mP, vQ, mA, ρ, ρ¹, σ, numElementsX, numRowsA);
+    
+    vXP = zeros(numElementsX); #<! Previous iteration of vX
+    vZ  = zeros(numRowsA);
+    vY  = zeros(numRowsA);
+    vZP = zeros(numRowsA); #<! Previous iteration of vZ
+    
+    changedΡ = false;
+    if (adptΡ)
+        # ̂ρ = ρ; #<! Won't work
+        ρρ = ρ;
+    end
+    
+    for ii in 1:numIterations
+        if (adptΡ && ((ρρ * fctrΡ < ρ) || (ρρ > fctrΡ * ρ)))
+            ρ   = ρρ;
+            ρ¹  = 1 / ρ;
+            
+            changedΡ = true;
+        end
+        
+        LinearSystemSolverLdl!(tuSolver, vXX, VZZ, vX, mP, vQ, mA, vZ, vY, ρ, ρ¹, σ, numElementsX, numRowsA, changedΡ);
+
+        copyto!(vXP, vX);
+        @. vX = α * vXX + α¹ * vX;
+        
+        copyto!(vZP, vZ);
+        @. vZ = clamp(α * vZZ + α¹ * vZ + ρ¹ * vY, vL, vU); #<! Projection
+        @. vY = vY + ρ * (α * vZZ + α¹ * vZP - vZ);
+        
+        changedΡ = false;
+        if (mod(ii, numItrConv) == 0)
+            ρρ, convFlag = CheckConvergence(vX, mP, vQ, mA, vZ, vY, ρ, ϵAbs, ϵRel);
+
+            if(convFlag ≠ convNumItr)
+                break;
+            end
+        end
+        
+    end
+    
+    return convFlag;
+    
+    
+end
+
+
+function CheckConvergence(vX, mP, vQ, mA, vZ, vY, ρ, ϵAbs, ϵRel)
+    
+    MIN_VAL_Ρ = 1e-3;
+    MAX_VAL_Ρ = 1e6;
+
+    # Pre Computation
+    normResPrim = norm(mA * vX - vZ, Inf);
+    normResDual = norm(mP * vX + vQ + mA' * vY, Inf);
+    
+    maxNormPrim = max(norm(mA * vX, Inf), norm(vZ, Inf));
+    maxNormDual = max(norm(mP * vX, Inf), norm(mA' * vY, Inf), norm(vQ, Inf));
+    
+    # Adaptive Rho
+    if (adptΡ)
+        numeratorVal    = normResPrim * maxNormDual;
+        denominatorVal  = normResDual * maxNormPrim;
+        ρρ              = clamp(ρ * sqrt(numeratorVal / denominatorVal), MIN_VAL_Ρ, MAX_VAL_Ρ);
+    end
+    
+    # Termination
+    epsPrim = ϵAbs + ϵRel * maxNormPrim;
+    epsDual = ϵAbs + ϵRel * maxNormDual;
+    
+    if ((normResPrim < epsPrim) && (normResDual < epsDual))
+        convFlag = convPrimDual;
+    end
+    if ((norm(vX - vXP, Inf) <= ϵAdmm) && (norm(vZ - vZP, Inf) <= ϵAdmm))
+        convFlag = convAdmm;
+    end
+
+    return ρρ, convFlag;
+
+
+end
+
+
+function LinearSystemSolverLdlInit(vX, mP, vQ, mA, ρ, ρ¹, σ, numElements, numConstraints)
+    
+    hDL = ldlt([mP + sparse(σ * I, numElements, numElements) mA'; mA sparse(-ρ¹ * I, numConstraints, numConstraints)]);
+    vV  = zeros(numConstraints + numElements); #<! Buffer
+    
+    vXX = @view vV[1:numElements];
+    vZZ = @view vV[(numElements + 1):end];
+    
+    return vXX, vZZ, (hDl, vV);
+    
+end
+
+function LinearSystemSolverLdl!(tuSolver, vXX, VZZ, vX, mP, vQ, mA, vZ, vY, ρ, ρ¹, σ, numElements, numConstraints, changedΡ)
+    
+    hDL = tuSolver[1];
+    vV  = tuSolver[2];
+    
+    if (changedΡ)
+        hDL = ldlt([mP + sparse(σ * I, numElements, numElements) mA'; mA sparse(-ρ¹ * I, numConstraints, numConstraints)]);
+    end
+    
+    @. vXX = σ * vX - vQ;
+    @. vZZ = vZ - ρ¹ * vY;
+    vV .= hDL \ vV; #<! Like copy!() / copyto!()
+    @. vZZ = vZ + ρ¹ * (vZZ - vY);
+
+    return;
     
 end

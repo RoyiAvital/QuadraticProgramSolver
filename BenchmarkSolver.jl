@@ -22,7 +22,7 @@ end
 function BenchmarkSolver(solverFun, problemClass::ProblemClass, vNumElements, vNumConstraints; benchMarkSamples = 10, benchMarkEvals = 1, benchMarkSeconds = 90)
     
     # mR = Matrix{Float64}(undef, numDims, 5); #<! Min Time [Nano Sec], Median Time [Nano Sec], Max Time [Nano Sec], Number of Allocations, Allocations Size
-    cBenchMark = Array{Any}(undef, numDims);
+    cBenchMark = Vector{Any}(undef, numDims);
     
     for ii in 1:numDims
         mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, vNumElements[ii], numConstraints = vNumConstraints[ii]);
