@@ -1,15 +1,12 @@
 # Unit Test for `SolveQuadraticProgram()`
 
-using LinearAlgebra
-using SparseArrays
-using Plots
-using Random
-using StableRNGs
-using MAT
-using BenchmarkTools
-
-BenchmarkTools.DEFAULT_PARAMETERS.samples = 5;
-BenchmarkTools.DEFAULT_PARAMETERS.seconds = 10;
+using LinearAlgebra;
+using SparseArrays;
+using Plots;
+using Random;
+using StableRNGs;
+using MAT;
+using BenchmarkTools;
 
 seedNumber = 1234;
 Random.seed!(seedNumber);
@@ -24,20 +21,21 @@ include("SolveQuadraticProgram.jl");
 ## Parameters
 
 # Simulaion
-numElements     = 1000;
-numConstraints  = 100;
+numElements     = 800;
+numConstraints  = 400;
 
 dataSource      = dataSourceGenerated;
 dataFileName    = "QpModel.mat";
 
 # problemClass    = rand(instances(ProblemClass));
-problemClass    = isotonicRegression;
+problemClass    = randomQp;
 
 # Solver
-numIterations   = 5000;
+numIterations   = 7500;
 ρ               = 1e6
 adptΡ           = true;
 linSolverMode   = modeItertaive;
+numItrPolish    = 0;
 
 if (dataSource == dataSourceGenerated)
     mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements, numConstraints = numConstraints);
@@ -56,6 +54,11 @@ numConstraints  = size(mA, 1);
 
 vXX = zeros(numElements);
 
-sBenchMark = @benchmark convFlag = SolveQuadraticProgram!($vX, $mP, $vQ, $mA, $vL, $vU; numIterations = $numIterations, ρ = $ρ, adptΡ = $adptΡ, linSolverMode = $linSolverMode); setup = (vX .= $vXX);
-display(sBenchMark);
-println(convFlag);
+sBenchMark = @benchmarkable SolveQuadraticProgram!(vX, $mP, $vQ, $mA, $vL, $vU; numIterations = $numIterations, ρ = $ρ, adptΡ = $adptΡ, linSolverMode = $linSolverMode, numItrPolish = $numItrPolish) setup = (vX = copy($vXX));
+currTime    = time();
+tuRunResult = BenchmarkTools.run_result(sBenchMark, samples = 10, evals = 1, seconds = 150); #<! A trick to get result as well
+runTime     = time() - currTime;
+
+display(tuRunResult[1]);
+println("\nTotal Run Time: $runTime [Sec]");
+println("The Alogrihtm Convergence Status: $(tuRunResult[2])\n\n");
