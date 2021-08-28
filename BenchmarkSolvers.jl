@@ -16,7 +16,7 @@ include("SolveQuadraticProgram.jl");
 NS_TO_SEC_FCTR          = 1e-9;
 BYTE_TO_MEGA_BYTE_FCTR  = 2 ^ -20;
 
-problemClass        = randomQp;
+problemClass        = isotonicRegression;
 numElementsMin      = 250;
 numElementsMax      = 750;
 numConstraintsMin   = 125;
@@ -24,7 +24,7 @@ numConstraintsMax   = 375;
 numDims             = 3;
 logSpace            = false;
 
-hF(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
+hF(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgramModular!(vX, mP, vQ, mA, vL, vU;
 numIterations = 5000, ϵAbs = 1e-6, ϵRel = 1e-6,
 ρ = 1e6, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ = true, 
 fctrΡ = 5, numItrPolish = 0, linSolverMode = modeItertaive,
