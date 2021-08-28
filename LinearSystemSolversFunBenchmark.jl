@@ -8,7 +8,7 @@ using BenchmarkTools;
 Random.seed!(1234);
 
 include("GenerateQuadraticProgram.jl");
-include("LinearSystemSolvers.jl");
+include("LinearSystemSolversFun.jl");
 
 NS_TO_SEC_FCTR          = 1e-9;
 BYTE_TO_MEGA_BYTE_FCTR  = 2 ^ -20;

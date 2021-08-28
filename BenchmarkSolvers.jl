@@ -12,35 +12,43 @@ Random.seed!(seedNumber);
 
 include("BenchmarkSolver.jl");
 include("SolveQuadraticProgram.jl");
+include("LinearSystemSolvers.jl");
 
 NS_TO_SEC_FCTR          = 1e-9;
 BYTE_TO_MEGA_BYTE_FCTR  = 2 ^ -20;
 
 problemClass        = isotonicRegression;
-numElementsMin      = 250;
-numElementsMax      = 750;
-numConstraintsMin   = 125;
-numConstraintsMax   = 375;
+numElementsMin      = 750;
+numElementsMax      = 1500;
+numConstraintsMin   = 0;
+numConstraintsMax   = 0;
 numDims             = 3;
 logSpace            = false;
 
-hF(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgramModular!(vX, mP, vQ, mA, vL, vU;
+solversLabels = [];
+
+hF(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, LaLdlInit, LaLdl!;
 numIterations = 5000, ϵAbs = 1e-6, ϵRel = 1e-6,
-ρ = 1e6, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ = true, 
-fctrΡ = 5, numItrPolish = 0, linSolverMode = modeItertaive,
-ϵPcg = 1e-7, numItrPcg = 5000, ϵMinres = 1e-6, numItrMinres = 500, numItrConv = 25);
+ρ = 1, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ = true, 
+fctrΡ = 5, numItrConv = 25, numItrPolish = 0, ϵMinres = 1e-6, numItrMinres = 500);
+push!(solversLabels, "LA LDL");
 
-hG(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU;
+hG(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, QDLdlInit, QDLdl!;
 numIterations = 5000, ϵAbs = 1e-6, ϵRel = 1e-6,
-ρ = 1e6, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ = true, 
-fctrΡ = 5, numItrPolish = 0, linSolverMode = modeDirect,
-ϵPcg = 1e-7, numItrPcg = 5000, ϵMinres = 1e-6, numItrMinres = 500, numItrConv = 25);
+ρ = 1, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ = true, 
+fctrΡ = 5, numItrConv = 25, numItrPolish = 0, ϵMinres = 1e-6, numItrMinres = 500);
+push!(solversLabels, "QD LDL");
 
-vFun = [hF; hG];
+hH(vX, mP, vQ, mA, vL, vU) = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, FacLdlInit, FacLdl!;
+numIterations = 5000, ϵAbs = 1e-6, ϵRel = 1e-6,
+ρ = 1, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ = true, 
+fctrΡ = 5, numItrConv = 25, numItrPolish = 0, ϵMinres = 1e-6, numItrMinres = 500);
+push!(solversLabels, "LDLFac LDL");
 
-solversLabels = ["Iterative Solver" "Direct Solver"];
+vFun = [hF; hG; hH];
 
-numSolvers = size(vFun, 1);
+numSolvers      = size(vFun, 1);
+solversLabels   = reshape(solversLabels, 1, numSolvers); #<! For plotting
 
 vNumElements    = GenerateElementsVector(numElementsMin, numElementsMax; logSpace = logSpace);
 vNumConstraints = GenerateElementsVector(numConstraintsMin, numConstraintsMax; logSpace = logSpace);
@@ -55,7 +63,7 @@ for ii = 1:numSolvers
 
     println(cBenchMark);
     
-    println("\nThe Run Time of the $ii -th Solver $runTime [Sec]\n");
+    println("\nThe Run Time of the $ii -th Solver ($(solversLabels[ii])): $runTime [Sec]\n");
     for jj = 1:numDims
         tR[jj, ii, 1] = min(cBenchMark[jj].times...);
         tR[jj, ii, 2] = max(cBenchMark[jj].times...);
