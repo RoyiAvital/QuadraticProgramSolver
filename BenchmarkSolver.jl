@@ -19,7 +19,7 @@ function GenerateElementsVector(numElementsMin = 20, numElementsMax = 2000; logS
     return vNumElements;
 end
 
-function BenchmarkSolver(solverFun, problemClass::ProblemClass, vNumElements, vNumConstraints; benchMarkSamples = 10, benchMarkEvals = 1, benchMarkSeconds = 90)
+function BenchmarkSolver(solverFun, problemClass::ProblemClass, vNumElements, vNumConstraints; benchMarkSamples = 10, benchMarkEvals = 1, benchMarkSeconds = 120)
     
     # mR = Matrix{Float64}(undef, numDims, 5); #<! Min Time [Nano Sec], Median Time [Nano Sec], Max Time [Nano Sec], Number of Allocations, Allocations Size
     cBenchMark = Vector{Any}(undef, numDims);

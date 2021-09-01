@@ -14,6 +14,7 @@ Random.seed!(seedNumber);
 
 include("GenerateQuadraticProgram.jl");
 include("SolveQuadraticProgram.jl");
+include("LinearSystemSolvers.jl");
 
 # @enum ProblemClass randomQp = 1 inequalityConstrainedQp equalityConstrainedQp optimalControl portfolioOptimization lassoOptimization huberFitting supportVectorMachine isotonicRegression
 @enum DataSource dataSourceGenerated = 1 dataSourceLoaded
@@ -54,7 +55,10 @@ numConstraints  = size(mA, 1);
 
 vXX = zeros(numElements);
 
-sBenchMark = @benchmarkable SolveQuadraticProgram!(vX, $mP, $vQ, $mA, $vL, $vU; numIterations = $numIterations, ρ = $ρ, adptΡ = $adptΡ, linSolverMode = $linSolverMode, numItrPolish = $numItrPolish) setup = (vX = copy($vXX));
+hLinSolInit = QDLdlInit;
+hLinSol     = QDLdl!;
+
+sBenchMark = @benchmarkable SolveQuadraticProgram!(vX, $mP, $vQ, $mA, $vL, $vU, hLinSolInit, hLinSol; numIterations = $numIterations, ρ = $ρ, adptΡ = $adptΡ, numItrPolish = $numItrPolish) setup = (vX = copy($vXX));
 currTime    = time();
 tuRunResult = BenchmarkTools.run_result(sBenchMark, samples = 10, evals = 1, seconds = 150); #<! A trick to get result as well
 runTime     = time() - currTime;

@@ -62,8 +62,8 @@ vX = zeros(numElements);
 
 fObjFun(vX) = 0.5 * dot(vX, mP, vX) + dot(vQ, vX);
 
-hLinSolInit = QDLdlInit;
-hLinSol     = QDLdl!;
+hLinSolInit = LinMapsCgInit;
+hLinSol     = LinMapsCg!;
 
 osqPModel = OSQP.Model();
 OSQP.setup!(osqPModel; P = mP, q = vQ, A = mA, l = vL, u = vU, rho = ρ, eps_abs = 1e-6, eps_rel = 1e-6, scaling = 0, );

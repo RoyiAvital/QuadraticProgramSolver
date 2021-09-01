@@ -4,6 +4,7 @@ using SparseArrays;
 using IterativeSolvers;
 using Krylov;
 using LinearOperators;
+using LinearMaps;
 using QDLDL;
 using LDLFactorizations;
 using MKLSparse;
@@ -165,6 +166,49 @@ function LinOpCg!(tuSolver, vXX, vZZ, vX, mP, vQ, mA, vZ, vY, ρ, ρ¹, σ, numE
             mul!(vU, mP, vW, one(Float64), ρ);
             vU .= vU .+ (σ .* vW);
         end);
+    end
+
+    mL = tuSolver[1];
+    vT = tuSolver[2];
+
+    @. vZZ = ρ * vZ - vY; #<! Using `vZZ` as a buffer
+    mul!(vT, mA', vZZ);
+    @. vT = σ * vX - vQ + vT;
+    IterativeSolvers.cg!(vXX, mL, vT, abstol = ϵPcg, maxiter = numItrPcg);
+    # cg!(vXX, mL, σ * vX - vQ + mA' * (ρ * vZ - vY), abstol = ϵPcg, maxiter = numItrPcg);
+    mul!(vZZ, mA, vXX);
+
+
+end
+
+function LinMapsCgInit(vX, mP, vQ, mA, ρ, ρ¹, σ, numElements, numConstraints)
+
+    vXX = zeros(numElements);
+    vZZ = zeros(numConstraints);
+    
+    vT  = zeros(numElements); #<! Buffer
+    
+    mL = LinearMap{Float64}(((vU, vW) -> begin
+        mul!(vZZ, mA, vW);
+        mul!(vU, mA', vZZ);
+        mul!(vU, mP, vW, one(Float64), ρ);
+        vU .= vU .+ (σ .* vW);
+    end), numElements, numElements; issymmetric = true, isposdef = true, ismutating = true);
+
+    return vXX, vZZ, [mL, vT];
+
+
+end
+
+function LinMapsCg!(tuSolver, vXX, vZZ, vX, mP, vQ, mA, vZ, vY, ρ, ρ¹, σ, numElements, numConstraints, changedΡ; ϵPcg = 1e-6, numItrPcg = 1000)
+    
+    if (changedΡ)
+        tuSolver[1] = LinearMap{Float64}(((vU, vW) -> begin
+            mul!(vZZ, mA, vW);
+            mul!(vU, mA', vZZ);
+            mul!(vU, mP, vW, one(Float64), ρ);
+            vU .= vU .+ (σ .* vW);
+        end), numElements, numElements; issymmetric = true, isposdef = true, ismutating = true);
     end
 
     mL = tuSolver[1];
