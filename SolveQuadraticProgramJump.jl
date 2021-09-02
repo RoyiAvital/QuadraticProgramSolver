@@ -4,6 +4,8 @@ using Gurobi;
 function SolveQpJump(mP, vQ, mA, vL, vU; hOptFun = nothing, verbosFlag = false)
     #TODO: See https://discourse.julialang.org/t/67214/5
     # Check if it gives speed improvements.
+
+    numElements = size(mP, 1);
     
     if (isnothing(hOptFun))
         hOptFun = Gurobi.Optimizer;

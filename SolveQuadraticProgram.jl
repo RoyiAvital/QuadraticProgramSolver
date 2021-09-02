@@ -3,8 +3,6 @@ using LinearAlgebra;
 using SparseArrays;
 using IterativeSolvers;
 using MKLSparse; #<! Impportant for the Iterative Solver (Much faster sparseMat * denseVec)
-using LinearOperators;
-using QDLDL;
 
 # using Parameters #<! Might help with packing / unpacking of parameters
 
@@ -63,7 +61,7 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, LinSysSolInit, LinSysSol
         @. vY = vY + ρ * (α * vZZ + α¹ * vZP - vZ);
         
         if (mod(ii, numItrConv) == 0)
-            ρρ, convFlag = CheckConvergence(vX, mP, vQ, mA, vZ, vY, vXP, vZP, ρ, ρρ, ϵAbs, ϵRel, ϵAdmm, convFlag);
+            ρρ, convFlag = CheckConvergence(vX, mP, vQ, mA, vZ, vY, vXP, vZP, ρ, ρρ, adptΡ, ϵAbs, ϵRel, ϵAdmm, convFlag);
             
             if(convFlag ≠ convNumItr)
                 break;
@@ -78,7 +76,7 @@ function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, LinSysSolInit, LinSysSol
 end
 
 
-function CheckConvergence(vX, mP, vQ, mA, vZ, vY, vXP, vZP, ρ, ρρ, ϵAbs, ϵRel, ϵAdmm, convFlag)
+function CheckConvergence(vX, mP, vQ, mA, vZ, vY, vXP, vZP, ρ, ρρ, adptΡ, ϵAbs, ϵRel, ϵAdmm, convFlag)
     #TODO: Use buffers for the intermediate allocations (mP * vX, mA * vX, ...)
     MIN_VAL_Ρ = 1e-3;
     MAX_VAL_Ρ = 1e6;

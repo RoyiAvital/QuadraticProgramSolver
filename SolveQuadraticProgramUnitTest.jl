@@ -28,17 +28,17 @@ include("SolveQuadraticProgramJump.jl");
 
 # Simulaion
 numSimulations  = 10;
-numElements     = 500;
+numElements     = 2500;
 numConstraints  = 0; #<! Set to 0 for OSQP Paper dimensions
 
 dataSource      = dataSourceGenerated;
 dataFileName    = "QpModel.mat";
 
 # problemClass    = rand(instances(ProblemClass));
-problemClass    = supportVectorMachine;
+problemClass    = randomQp;
 
 # Solver
-numIterations   = 5000;
+numIterations   = 2000;
 ρ               = 0.1;
 adptΡ           = true;
 linSolverMode   = modeDirect;
@@ -62,14 +62,15 @@ vX = zeros(numElements);
 
 fObjFun(vX) = 0.5 * dot(vX, mP, vX) + dot(vQ, vX);
 
-hLinSolInit = LinMapsCgInit;
-hLinSol     = LinMapsCg!;
+hLinSolInit = FacLdlInit;
+hLinSol     = FacLdl!;
 
-osqPModel = OSQP.Model();
-OSQP.setup!(osqPModel; P = mP, q = vQ, A = mA, l = vL, u = vU, rho = ρ, eps_abs = 1e-6, eps_rel = 1e-6, scaling = 0, );
-
-runTimeJump = @elapsed vT = SolveQpJump(mP, vQ, mA, vL, vU; hOptFun = Gurobi.Optimizer);
-runTimeOsqp = @elapsed osqpRes = OSQP.solve!(osqPModel);
+vT = SolveQpJump(mP, vQ, mA, vL, vU; hOptFun = Gurobi.Optimizer);
+runTimeJump = @elapsed begin
+    osqPModel = OSQP.Model();
+    OSQP.setup!(osqPModel; P = mP, q = vQ, A = mA, l = vL, u = vU, rho = ρ, eps_abs = 1e-6, eps_rel = 1e-6, scaling = 0);
+    runTimeOsqp = @elapsed osqpRes = OSQP.solve!(osqPModel);
+end
 runTime     = @elapsed convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, hLinSolInit, hLinSol; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ);
 
 maxAbsDev = norm(vT - vX, Inf);
