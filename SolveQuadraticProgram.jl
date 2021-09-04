@@ -13,7 +13,7 @@ using MKLSparse; #<! Impportant for the Iterative Solver (Much faster sparseMat 
 
 function SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, LinSysSolInit, LinSysSol!;
     numIterations = 5000, ϵAbs = 1e-6, ϵRel = 1e-6,
-    ρ = 1e6, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ::Bool = false, 
+    ρ = 1, σ = 1e-6, α = 1.6, δ = 1e-6, adptΡ::Bool = false, 
     fctrΡ = 5, numItrConv = 25, numItrPolish = 10, ϵMinres = 1e-6, numItrMinres = 500)
     
     numElementsX            = size(vX, 1);

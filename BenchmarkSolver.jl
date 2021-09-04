@@ -1,6 +1,6 @@
 # Benchmark (Performance) a Solver
 
-using BenchmarkTools
+using BenchmarkTools;
 
 include("GenerateQuadraticProgram.jl");
 

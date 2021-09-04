@@ -39,12 +39,12 @@ mNumElements = [    0010 0100;
 mNumConstraints = [ 0000 0000;
 0000 0000;
 0005 0050;
-0000 0000
-0000 0000
-0000 0000
-0000 0000
-0000 0000
-0000 0000]; #<! Set to 0 for OSQP Paper dimensions
+0000 0000;
+0000 0000;
+0000 0000;
+0000 0000;
+0000 0000;
+0000 0000;]; #<! Set to 0 for OSQP Paper dimensions
 
 # Solver
 numIterations   = 50000;
