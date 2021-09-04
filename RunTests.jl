@@ -63,7 +63,7 @@ hOptFun = optimizer_with_attributes(Gurobi.Optimizer, "OptimalityTol" => 1e-8, "
 for problemClass ∈ instances(ProblemClass)
     @testset "Unit Test of $(problemClass) Problem Class" begin
     for iSim ∈ 1:numSimulations
-        for iDim ∈ size(mNumElements, 2)
+        for iDim ∈ 1:size(mNumElements, 2)
             mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, mNumElements[Int(problemClass), iDim]; numConstraints = mNumConstraints[Int(problemClass), iDim]);
             # Some problems might change the actual data
             numElements     = size(mP, 1);
