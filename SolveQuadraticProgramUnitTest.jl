@@ -28,20 +28,20 @@ include("SolveQuadraticProgramJump.jl");
 
 # Simulaion
 numSimulations  = 10;
-numElements     = 2500;
+numElements     = 1000;
 numConstraints  = 0; #<! Set to 0 for OSQP Paper dimensions
 
 dataSource      = dataSourceGenerated;
 dataFileName    = "QpModel.mat";
 
 # problemClass    = rand(instances(ProblemClass));
-problemClass    = randomQp;
+problemClass    = isotonicRegression;
 
 # Solver
-numIterations   = 2000;
+numIterations   = 5000;
 ρ               = 0.1;
 adptΡ           = true;
-linSolverMode   = modeDirect;
+numItrPolish    = 0;
 
 if (dataSource == dataSourceGenerated)
     mP, vQ, mA, vL, vU = GenerateRandomQP(problemClass, numElements; numConstraints = numConstraints);
@@ -62,20 +62,20 @@ vX = zeros(numElements);
 
 fObjFun(vX) = 0.5 * dot(vX, mP, vX) + dot(vQ, vX);
 
-hLinSolInit = FacLdlInit;
-hLinSol     = FacLdl!;
+hLinSolInit = QDLdlInit;
+hLinSol     = QDLdl!;
 
-vT = SolveQpJump(mP, vQ, mA, vL, vU; hOptFun = Gurobi.Optimizer);
-runTimeJump = @elapsed begin
+runTimeJump = @elapsed vT = SolveQpJump(mP, vQ, mA, vL, vU; hOptFun = Gurobi.Optimizer);
+runTimeOsqp = @elapsed begin
     osqPModel = OSQP.Model();
     OSQP.setup!(osqPModel; P = mP, q = vQ, A = mA, l = vL, u = vU, rho = ρ, eps_abs = 1e-6, eps_rel = 1e-6, scaling = 0);
-    runTimeOsqp = @elapsed osqpRes = OSQP.solve!(osqPModel);
+    osqpRes = OSQP.solve!(osqPModel);
 end
-runTime     = @elapsed convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, hLinSolInit, hLinSol; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ);
+runTime     = @elapsed convFlag = SolveQuadraticProgram!(vX, mP, vQ, mA, vL, vU, hLinSolInit, hLinSol; numIterations = numIterations, ρ = ρ, adptΡ = adptΡ, numItrPolish = numItrPolish);
 
 maxAbsDev = norm(vT - vX, Inf);
 
-display(scatter([vX, vT], title = "Solver Solution\nMax Absolute Deviation: $(maxAbsDev)\nRun Time: $(runTime) [Sec], Solver Mode: $(linSolverMode)", label = ["Solver" "Reference"]));
+display(scatter([vX, vT], title = "Solver Solution\nMax Absolute Deviation: $(maxAbsDev)\nRun Time: $(runTime) [Sec], Solver: $(hLinSol)", label = ["Solver" "Reference"]));
 display(scatter([mA * vT, vL, vU], title = "Constraints Map", label = ["Solver" "Lower Boundary" "Upper Boundary"]));
 
 println("The max absolute error is: $(maxAbsDev)");
