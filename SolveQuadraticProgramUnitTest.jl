@@ -28,7 +28,7 @@ include("SolveQuadraticProgramJump.jl");
 
 # Simulaion
 numSimulations  = 10;
-numElements     = 1000;
+numElements     = 800;
 numConstraints  = 0; #<! Set to 0 for OSQP Paper dimensions
 
 dataSource      = dataSourceGenerated;

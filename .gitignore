@@ -3,6 +3,9 @@
 # Ignore Work in Progress
 **/*WIP
 
+# Ignore Tests / Benchmark Results
+*.csv
+
 # Media Files
 # *.png
 # *.jpg
