@@ -9,6 +9,10 @@ using QDLDL;
 using LDLFactorizations;
 using MKLSparse;
 
+# Examples of Intel MKL Pardiso Solver in Iterative:
+# https://github.com/sshin23/MadNLP.jl/blob/master/src/LinearSolvers/pardisomkl.jl
+# https://github.com/oxfordcontrol/COSMO.jl/blob/master/src/COSMO.jl
+
 function LaLdlInit(vX, mP, vQ, mA, ρ, ρ¹, σ, numElements, numConstraints)
     
     hDL = ldlt([mP + sparse(σ * I, numElements, numElements) mA'; mA sparse(-ρ¹ * I, numConstraints, numConstraints)]);
