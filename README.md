@@ -1,5 +1,11 @@
-[![Visitors](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FRoyiAvital%2FStackExchangeCodes&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=Visitors+%28Daily+%2F+Total%29&edge_flat=false)](https://github.com/RoyiAvital/QuadraticProgramSolver)
+<!-- https://visitor-badge.glitch.me/ -->
+<!-- ![Visitors](https://visitor-badge.glitch.me/badge?page_id=RoyiAvital.StackExchangeCodes) -->
+<!-- https://hits.seeyoufarm.com/ -->
+[![Visitors](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2FRoyiAvital%2FStackExchangeCodes&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=Visitors+%28Daily+%2F+Total%29&edge_flat=false)](https://github.com/RoyiAvital/StackExchangeCodes)
+[![Visitors](https://api.visitorbadge.io/api/combined?path=https%3A%2F%2Fgithub.com%2FRoyiAvital%2FStackExchangeCodes&labelColor=%23f47373&countColor=%23555555&style=plastic)](https://github.com/RoyiAvital/StackExchangeCodes) <!-- https://www.visitorbadge.io -->
+[![DOI](https://zenodo.org/badge/44807437.svg)](https://zenodo.org/badge/latestdoi/44807437)
 <a href="https://liberapay.com/Royi/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a>
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K8BLS2B)
 
 # Quadratic Program Solver
 [![View Quadratic Program Solver on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/97899)
@@ -13,11 +19,13 @@ This is a MATLAB implementation of the paper - [OSQP: An Operator Splitting Solv
 
 I needed for some Signal / Image Processing projects a solver of a problem of the form:
 
-$$\begin{aligned}
+$$
+\begin{aligned}
 \arg \min_{\boldsymbol{x}} & \quad \frac{1}{2} {\left\| A \boldsymbol{x} - \boldsymbol{b} \right\|}_{2}^{2} \\
 \text{subject to} & \quad B \boldsymbol{x} \leq \boldsymbol{c} \\
 & \quad D \boldsymbol{x} = \boldsymbol{e}
-\end{aligned}$$
+\end{aligned}
+$$
 
 I could use MATLAB's [`quadprog()`](https://www.mathworks.com/help/optim/ug/quadprog.html) or [`lsqlin()`](https://www.mathworks.com/help/optim/ug/lsqlin.html) yet both are part of the [Optimization Toolbox][003] which isn't widely accessible.  
 When I learned about ADMM, Projection and Optimization in general I played with some implementations for this problem but they were pretty slow and sensitive to parameters.  
@@ -44,7 +52,7 @@ $$\begin{aligned}
 \text{subject to} & \quad \boldsymbol{l} \leq A \boldsymbol{x} \leq \boldsymbol{u}
 \end{aligned}$$
 
-Where $ P \in \mathbb{S}_{+}^{n} $ (A symmetric positive semi definite matrix).  
+Where $P \in \mathbb{S}_{+}^{n}$ (A symmetric positive semi definite matrix).  
 
 ## Documentation
 

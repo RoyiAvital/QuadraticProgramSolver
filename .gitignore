@@ -25,6 +25,9 @@
 *.xls
 *.xlsx
 
+# Julia Files
+Manifest.toml
+
 # MATLAB Files
 *.asv
 *.m~
