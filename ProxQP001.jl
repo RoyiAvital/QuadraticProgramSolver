@@ -46,12 +46,12 @@ oRng = StableRNG(1234);
 
 ## Functions
 
-function CVXSolver( mA :: Matrix{T}, vB :: Vector{T}, mC :: Matrix{T}, vD :: Vector{T}, mE :: Matrix{T}, vF :: Vector{T} ) where {T <: AbstractFloat}
+function CVXSolver( mP :: Matrix{T}, vQ :: Vector{T}, mA :: Matrix{T}, vB :: Vector{T}, mC :: Matrix{T}, vD :: Vector{T} ) where {T <: AbstractFloat}
 
-    dataDim = size(mA, 1);
+    dataDim = size(mP, 1);
 
     vX = Convex.Variable(dataDim);
-    sConvProb = minimize( T(0.5) * Convex.quadform(vX, mA) + Convex.dot(vB, vX), [mC * vX == vD, mE * vX <= vF] );
+    sConvProb = minimize( T(0.5) * Convex.quadform(vX, mP) + Convex.dot(vQ, vX), [mA * vX == vB, mC * vX <= vD] );
     solve!(sConvProb, ECOS.Optimizer; silent = true);
     
     return vec(vX.value);
@@ -73,33 +73,33 @@ numIterations = 250;
 
 ## Load / Generate Data
 
-mA = randn(dataDim, dataDim);
-mA = mA' * mA + 0.01 * I;
-mA = 0.5 * (mA + mA');
-vB = randn(dataDim);
+mP = randn(dataDim, dataDim);
+mP = mP' * mP + 0.01 * I;
+mP = 0.5 * (mP + mP');
+vQ = randn(dataDim);
 
-mC = randn(numEq, dataDim);
-vD = randn(numEq);
-
-mE = randn(numInEq, dataDim);
-vF = randn(numInEq);
+# Equality Constraints
+mA = randn(numEq, dataDim);
+vB = randn(numEq);
+# Inequality Constraints
+mC = randn(numInEq, dataDim);
+vD = randn(numInEq);
 
 ## Analysis
 
 # Reference Solution
-vXRef = CVXSolver(mA, vB, mC, vD, mE, vF);
+vXRef = CVXSolver(mP, vQ, mA, vB, mC, vD);
 
 # ProxQP Solution
 
-vX = zeros(dataDim);
-vZ = zeros(numInEq);
+sProxQP = ProxQP(mP, vQ, mA, vB, mC, vD; ρ = 25.0, σ = 1e-5);
 
-isConv = SolveQuadraticProgram!(vX, vZ, mA, vB, mC, vD, mE, vF; numIterations = 5_000);
+isConv = SolveQuadraticProgram!(sProxQP; numIterations = 5_000);
 println(isConv);
 
-println(norm(vX - vXRef))
-println(norm(mC * vXRef - vD))
-println(norm(max.(mE * vXRef - vF, 0.0), Inf))
+println(norm(sProxQP.vX - vXRef));
+println(norm(mA * vXRef - vB, Inf));
+println(norm(max.(mC * vXRef - vD, 0.0), Inf));
 
 
 ## Display Results
@@ -127,4 +127,39 @@ println(norm(max.(mE * vXRef - vF, 0.0), Inf))
 #     figFileNme = @sprintf("Figure%04d.png", figureIdx);
 #     savefig(hP, figFileNme; width = hP.layout[:width], height = hP.layout[:height]);
 # end
+
+
+# function GenSpdMat( dataDim :: Int ) :: Matrix{Float64}
+
+#     mA = randn(dataDim, dataDim);
+#     mP = mA' * mA + 0.01 * I;
+#     mP = 0.5 * (mP + mP');
+
+#     return mP;
+
+# end
+
+
+# mAA = GenSpdMat(5);
+# mBB = GenSpdMat(5);
+# vBB = rand(5);
+
+# sCA = cholesky(mAA);
+# sCB = cholesky(mBB);
+
+# vT1 = sCB \ vBB;
+# vT2 = sCA \ vBB;
+
+# println(norm(vT1 - vT2));
+
+# cholesky!(mBB);
+
+# copyto!(sCA.U, UpperTriangular(mBB));
+# copyto!(sCA.factors, mBB);
+
+
+# vT1 = sCB \ vBB;
+# vT2 = sCA \ vBB;
+
+# println(norm(vT1 - vT2));
 
