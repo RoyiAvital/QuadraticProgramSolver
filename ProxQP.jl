@@ -73,7 +73,7 @@ end
 # Solving using ProxQP like approach
 function SolveQuadraticProgram!(sQpProb :: ProxQP{T, N}; numIterations :: N = 2000, ϵAbs = T(1e-7), ϵRel = T(1e-6), numItrConv :: N = 50, ρ :: T = T(1e2), σ :: T = T(1e-2), adptΡ :: Bool = true, τ :: T = T(10)) where {T <: AbstractFloat, N <: Integer}
     # Solves:
-    # \aeg \min_x 0.5 * x' * P * x + q' * x
+    # \arg \min_x 0.5 * x' * P * x + q' * x
     # Subject To: A * x  = b
     #             C * x <= d
     # Solves the nearest feasible QP problem.

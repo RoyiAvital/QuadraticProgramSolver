@@ -15,7 +15,7 @@ function _SolveQuadraticProgram!(vX :: Vector{T}, vZ :: Vector{T}, mA, vB, mC, v
     numIterations :: N = 2000, ϵAbs = T(1e-7), ϵRel = T(1e-6), numItrConv :: N = 10,
     ρ = T(1e-2), γ = T(1e2)) where {T <: AbstractFloat, N <: Integer}
     # Solves:
-    # \aeg \min_x 0.5 * x' * A * x + b' * x
+    # \arg \min_x 0.5 * x' * A * x + b' * x
     # Subject To: C * x  = d
     #             E * x <= f
     # Solves the nearest feasible QP problem.
