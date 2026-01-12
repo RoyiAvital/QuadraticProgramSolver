@@ -98,8 +98,8 @@ vXRef = CVXSolver(mP, vQ, mA, vB, mC, vD);
 sProxQP = ProxQP(mP, vQ, mA, vB, mC, vD);
 
 dReport = SolveQuadraticProgram!(sProxQP; numIterations = 5_000, ρ = 200.0, σ = 1e-2, adptΡ = true, τ = 10.0);
-# isConv = dReport["Converged"];
-# println(isConv);
+isConv = dReport["Converged"];
+println(isConv);
 
 println(norm(sProxQP.vX - vXRef));
 println(norm(mA * vXRef - vB, Inf));

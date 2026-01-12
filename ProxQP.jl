@@ -2,22 +2,26 @@ using LinearAlgebra;
 using SparseArrays;
 # using MKLSparse; #<! Impportant for the Iterative Solver (Much faster sparseMat * denseVec)
 
-#TODO: Add support for the Sparse matrices case
-struct ProxQP{T <: AbstractFloat, N <: Integer}
-    vX :: Vector{T} #<! Solution vector
-    mP :: Matrix{T} #<! Quadratic term
-    vQ :: Vector{T} #<! Linear term
-    mA :: Matrix{T} #<! Equality constraint matrix
-    vB :: Vector{T} #<! Equality constraint vector
-    mC :: Matrix{T} #<! Inequality constraint matrix
-    vD :: Vector{T} #<! Inequality constraint vector
-    vY :: Vector{T} #<! Dual variables for equality constraints
-    vZ :: Vector{T} #<! Dual variables for inequality constraints
-    vS :: Vector{T} #<! Slack variables for inequality constraints
-    mM :: Matrix{T} #<! Pre factorized matrix for the solver
-    # sC :: Union{Cholesky{T, Matrix{T}}, SparseArrays.CHOLMOD.Factor{T}} #<! Cholesky factorization of mM
-    sC :: Cholesky{T, Matrix{T}} #<! Cholesky factorization of mM
-    vR :: Vector{T} #<! Right hand side vector
+const MatLike{T} = Union{Matrix{T}, SparseMatrixCSC{T, Int}}
+const CholFac{T} = Union{Cholesky{T}, SparseArrays.CHOLMOD.Factor{T}}
+
+struct ProxQP{T <: AbstractFloat, MAT <: MatLike{T}, FC <: CholFac{T}, N <: Integer}
+    vX  :: Vector{T} #<! Solution vector
+    mP  :: MAT #<! Quadratic term (SPD Matrix)
+    vQ  :: Vector{T} #<! Linear term
+    mA  :: MAT #<! Equality constraint matrix
+    mAA :: MAT #<! Gram matrix of equality constraint matrix
+    vB  :: Vector{T} #<! Equality constraint vector
+    mC  :: MAT #<! Inequality constraint matrix
+    mCC :: MAT #<! Gram matrix of inequality constraint matrix
+    vD  :: Vector{T} #<! Inequality constraint vector
+    vY  :: Vector{T} #<! Dual variables for equality constraints
+    vZ  :: Vector{T} #<! Dual variables for inequality constraints
+    vS  :: Vector{T} #<! Slack variables for inequality constraints
+    mK  :: MAT #<! Gram matrix of all constraint matrices `(mAA + mCC)`
+    mM  :: MAT #<! Pre factorized matrix for the solver
+    sC  :: FC #<! Cholesky factorization of mM
+    vR  :: Vector{T} #<! Right hand side vector
     vX1 :: Vector{T} #<! Buffer vector `(dataDim, )` for multiplications
     vX2 :: Vector{T} #<! Buffer vector `(dataDim, )` for multiplications
     vX3 :: Vector{T} #<! Buffer vector `(dataDim, )` for multiplications
@@ -30,11 +34,16 @@ struct ProxQP{T <: AbstractFloat, N <: Integer}
     # σ  :: T        #<! Proximal penalty parameter for the Augmented Lagrangian (Only to set at the end of the optimization loop)
     # ρ¹ :: T        #<! Inverse of ADMM penalty parameter for constraints
 
-    function ProxQP(mP :: Matrix{T}, vQ :: Vector{T}, mA :: Matrix{T}, vB :: Vector{T}, mC :: Matrix{T}, vD :: Vector{T}, vX :: Vector{T}, vY :: Vector{T}, vZ :: Vector{T}, vS :: Vector{T}) where {T <: AbstractFloat}
+    function ProxQP(mP :: AbstractMatrix{T}, vQ :: Vector{T}, mA :: AbstractMatrix{T}, vB :: Vector{T}, mC :: AbstractMatrix{T}, vD :: Vector{T}, vX :: Vector{T}, vY :: Vector{T}, vZ :: Vector{T}, vS :: Vector{T}) where {T <: AbstractFloat}
         dataDim = size(mP, 1);
         numEq   = size(mA, 1);
         numInEq = size(mC, 1);
-        mM = mP + (mA' * mA) + (mC' * mC) + I;
+        mAA = mA' * mA;
+        mAA = T(0.5) * (mAA' + mAA);
+        mCC = mC' * mC;
+        mCC = T(0.5) * (mCC' + mCC);
+        mK = mAA + mCC;
+        mM = mP + mK;
         mM = T(0.5) * (mM' + mM);
         sC = cholesky(mM; check = false);
         vR = zeros(T, dataDim);
@@ -44,9 +53,14 @@ struct ProxQP{T <: AbstractFloat, N <: Integer}
         vBb = zeros(T, numEq);
         vDb = zeros(T, numInEq);
 
-        new{T, typeof(dataDim)}(vX, mP, vQ, mA, vB, mC, vD, vY, vZ, vS, mM, sC, vR, vX1, vX2, vX3, vBb, vDb, dataDim, numEq, numInEq);
+        new{T, typeof(mP), typeof(sC), typeof(dataDim)}(vX, mP, vQ, mA, mAA, vB, mC, mCC, vD, vY, vZ, vS, mK, mM, sC, vR, vX1, vX2, vX3, vBb, vDb, dataDim, numEq, numInEq);
     end
 end
+
+# Convenience aliases
+const DenseProxQP{T, N}  = ProxQP{T, Matrix{T},               Cholesky{T},                    N}
+const SparseProxQP{T, N} = ProxQP{T, SparseMatrixCSC{T, Int}, SparseArrays.CHOLMOD.Factor{T}, N}
+
 
 function ProxQP(mP :: Matrix{T}, vQ :: Vector{T}, mA :: Matrix{T}, vB :: Vector{T}, mC :: Matrix{T}, vD :: Vector{T}) where {T <: AbstractFloat}
     # Initializes the ProxQP problem structure with `vX` and `vZ` as solution to the QP wit only equality constraints
@@ -71,7 +85,7 @@ function ProxQP(mP :: Matrix{T}, vQ :: Vector{T}, mA :: Matrix{T}, vB :: Vector{
 end
 
 # Solving using ProxQP like approach
-function SolveQuadraticProgram!(sQpProb :: ProxQP{T, N}; numIterations :: N = 2000, ϵAbs = T(1e-7), ϵRel = T(1e-6), numItrConv :: N = 50, ρ :: T = T(1e2), σ :: T = T(1e-2), adptΡ :: Bool = true, τ :: T = T(10)) where {T <: AbstractFloat, N <: Integer}
+function SolveQuadraticProgram!(sQpProb :: ProxQP{T}; numIterations :: N = 2000, ϵAbs = T(1e-7), ϵRel = T(1e-6), numItrConv :: N = 50, ρ :: T = T(1e2), σ :: T = T(1e-2), adptΡ :: Bool = true, τ :: T = T(10)) where {T <: AbstractFloat, N <: Integer}
     # Solves:
     # \arg \min_x 0.5 * x' * P * x + q' * x
     # Subject To: A * x  = b
@@ -128,8 +142,40 @@ function SolveQuadraticProgram!(sQpProb :: ProxQP{T, N}; numIterations :: N = 20
     
 end
 
+function UpdateM!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: AbstractFloat, MAT <: Matrix{T}, FC <: Cholesky{T}}
+    # Updates the pre factorized matrix for the QP problem with no allocations
+    # mM = mP + ρ * (mA' * mA) + ρ * (mC' * mC) + σ * I;
+    @. sQpProb.mM = sQpProb.mP + ρ * sQpProb.mK;
+    # sQpProb.mM += σ * I; #<! σ * I + mM -> mM
+    @views sQpProb.mM[diagind(sQpProb.mM)] .+= σ; #<! TODO: Find non allocating implementation
+end
 
-function CalculateRhs!(sQpProb :: ProxQP{T, N}, ρ :: T, σ :: T) where {T <: AbstractFloat, N <: Integer}
+function UpdateM!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: AbstractFloat, MAT <: SparseMatrixCSC{T, Int}, FC <: Cholesky{T}}
+    # Updates the pre factorized matrix for the QP problem with no allocations
+    # mM = mP + ρ * (mA' * mA) + ρ * (mC' * mC) + σ * I;
+    @. sQpProb.mM.nzval = sQpProb.mP.nzval + ρ * sQpProb.mK.nzval;
+    # sQpProb.mM += σ * I; #<! σ * I + mM -> mM
+    @inbounds for kk in sQpProb.vDiagIdx
+        sQpProb.mM.nzval[kk] += σ;
+    end
+end
+
+function UpdateDecomposition!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: AbstractFloat, MAT <: Matrix{T}, FC <: Cholesky{T}}
+    # Updates the matrix decomposition for the QP problem with no allocations
+    UpdateM!(sQpProb, ρ, σ);
+    cholesky!(sQpProb.mM, check = false); #<! Update the Cholesky factorization
+    copyto!(sQpProb.sC.U, UpperTriangular(sQpProb.mM));
+    # copyto!(sQpProb.sC.factors, sQpProb.mM);
+end
+
+function UpdateDecomposition!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: AbstractFloat, MAT <: SparseMatrixCSC{T, Int}, FC <: SparseArrays.CHOLMOD.Factor{T}}
+    # Updates the matrix decomposition for the QP problem with no allocations
+    # Assumes the sparse pattern does not change
+    UpdateM!(sQpProb, ρ, σ);
+    cholesky!(sQpProb.sC, sQpProb.mM, check = false); #<! Update the Cholesky factorization
+end
+
+function CalculateRhs!(sQpProb :: ProxQP{T}, ρ :: T, σ :: T) where {T <: AbstractFloat}
     # Calculates the right hand side vector for the QP problem with no allocations
     # vR = -vQ - mA' * vY + ρ * mA' * vB - mC' * vZ + ρ * mC' * (vD - vS) + σ * vX;
     # vR = -vQ + mA' * (ρ * vB - vY) + mC' * (ρ * (vD - vS) - vZ) + σ * vX;    
@@ -142,27 +188,13 @@ function CalculateRhs!(sQpProb :: ProxQP{T, N}, ρ :: T, σ :: T) where {T <: Ab
 
 end
 
-function UpdateDecomposition!(sQpProb :: ProxQP{T, N}, ρ :: T, σ :: T) where {T <: AbstractFloat, N <: Integer}
-    # Updates the matrix decomposition for the QP problem with no allocations
-    # mM = mP + ρ * (mA' * mA) + ρ * (mC' * mC) + σ * I;
-    sQpProb.mM .= sQpProb.mP;
-    mul!(sQpProb.mM, sQpProb.mA', sQpProb.mA, ρ, T(1)); #<! ρ * (mA' * mA) + mM -> mM
-    mul!(sQpProb.mM, sQpProb.mC', sQpProb.mC, ρ, T(1)); #<! ρ * (mC' * mC) + mM -> mM
-    # sQpProb.mM += σ * I; #<! σ * I + mM -> mM
-    @views sQpProb.mM[diagind(sQpProb.mM)] .+= σ; #<! TODO: Find non allocating implementation
-    @. sQpProb.mM = T(0.5) * (sQpProb.mM' + sQpProb.mM); #<! Ensure symmetry
-    cholesky!(sQpProb.mM, check = false); #<! Update the Cholesky factorization
-    copyto!(sQpProb.sC.U, UpperTriangular(sQpProb.mM));
-    # copyto!(sQpProb.sC.factors, sQpProb.mM);
-end
-
-function UpdateX!(sQpProb :: ProxQP{T, N}) where {T <: AbstractFloat, N <: Integer}
+function UpdateX!(sQpProb :: ProxQP{T}) where {T <: AbstractFloat}
     # Updates the solution vector for the QP problem with no allocations
     # vX = sC \ vR;
     ldiv!(sQpProb.vX, sQpProb.sC, sQpProb.vR);
 end
 
-function UpdateS!(sQpProb :: ProxQP{T, N}, ρ¹ :: T) where {T <: AbstractFloat, N <: Integer}
+function UpdateS!(sQpProb :: ProxQP{T}, ρ¹ :: T) where {T <: AbstractFloat}
     # Updates the slack variable vector for the QP problem with no allocations
     # vS = max.(vD - mC * vX - ρ¹ * vZ, zero(T));
     @. sQpProb.vS = sQpProb.vD - ρ¹ * sQpProb.vZ;          #<! vD - ρ¹ * vZ -> vS
@@ -170,14 +202,14 @@ function UpdateS!(sQpProb :: ProxQP{T, N}, ρ¹ :: T) where {T <: AbstractFloat,
     @. sQpProb.vS = max(sQpProb.vS, zero(T));              #<! max.(vS, 0) -> vS
 end
 
-function UpdateY!(sQpProb :: ProxQP{T, N}, ρ :: T) where {T <: AbstractFloat, N <: Integer}
+function UpdateY!(sQpProb :: ProxQP{T}, ρ :: T) where {T <: AbstractFloat}
     # Updates the dual variable vector for equality constraints for the QP problem with no allocations
     # vY = vY + ρ * (mA * vX - vB);
     @. sQpProb.vY -= ρ * sQpProb.vB;                   #<! -ρ * vB + vY -> vY
     mul!(sQpProb.vY, sQpProb.mA, sQpProb.vX, ρ, T(1)); #<! ρ * (mA * vX) + vY -> vY
 end
 
-function UpdateZ!(sQpProb :: ProxQP{T, N}, ρ :: T) where {T <: AbstractFloat, N <: Integer}
+function UpdateZ!(sQpProb :: ProxQP{T}, ρ :: T) where {T <: AbstractFloat}
     # Updates the dual variable vector for inequality constraints for the QP problem with no allocations
     # vZ .+= ρ * (mC * vX - vD + vS);
     # vZ .= max.(vZ, zero(T));
@@ -187,7 +219,7 @@ function UpdateZ!(sQpProb :: ProxQP{T, N}, ρ :: T) where {T <: AbstractFloat, N
 end
 
 
-function CheckConvergence!(sQpProb :: ProxQP{T, N}, ϵAbs :: T, ϵRel :: T, ρ :: T, adptΡ :: Bool, τ :: T) where {T <: AbstractFloat, N <: Integer}
+function CheckConvergence!(sQpProb :: ProxQP{T}, ϵAbs :: T, ϵRel :: T, ρ :: T, adptΡ :: Bool, τ :: T) where {T <: AbstractFloat}
     # Using the convergenmce criteria from PIQP (https://arxiv.org/abs/2304.00290, Equations 13a, 13b, 13c)
     #TODO: Use buffers for the intermediate allocations (mP * vX, mA * vX, ...)
     MIN_VAL_Ρ = 1e-5;
@@ -238,7 +270,7 @@ end
 function _NormInfDif(vA :: Vector{T}, vB :: Vector{T}) where {T <: AbstractFloat}
 
     valNorm = zero(T);
-    for ii in eachindex(vA)
+    @inbounds @fastmath @simd for ii in eachindex(vA)
         valNorm = max(valNorm, abs(vA[ii] - vB[ii]));
     end
 
@@ -249,7 +281,7 @@ end
 function _NormInfDif(vA :: Vector{T}, vB :: Vector{T}, vC :: Vector{T}) where {T <: AbstractFloat}
 
     valNorm = zero(T);
-    for ii in eachindex(vA)
+    @inbounds @fastmath @simd for ii in eachindex(vA)
         valNorm = max(valNorm, abs(vA[ii] - vB[ii] + vC[ii]));
     end
 
@@ -260,7 +292,7 @@ end
 function _NormInfDif(vA :: Vector{T}, vB :: Vector{T}, vC :: Vector{T}, vD :: Vector{T}) where {T <: AbstractFloat}
 
     valNorm = zero(T);
-    for ii in eachindex(vA)
+    @inbounds @fastmath @simd for ii in eachindex(vA)
         valNorm = max(valNorm, abs(vA[ii] + vB[ii] + vC[ii] + vD[ii]));
     end
 
