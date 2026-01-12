@@ -32,7 +32,7 @@ using StableRNGs;
 ## Constants & Configuration
 RNG_SEED = 1234;
 
-include("ProxQP.jl");
+include("_ProxQP.jl");
 
 
 ## Settings
@@ -43,18 +43,17 @@ exportFigures = true;
 
 oRng = StableRNG(RNG_SEED);
 seedNum = Int(mod(round(time()), 5000));
-oRng = StableRNG(seedNum);
-oRng = StableRNG(1220);
+oRng = StableRNG(1517);
 
 
 ## Functions
 
-function CVXSolver( mP :: Matrix{T}, vQ :: Vector{T}, mA :: Matrix{T}, vB :: Vector{T}, mC :: Matrix{T}, vD :: Vector{T} ) where {T <: AbstractFloat}
+function _CVXSolver( mA :: Matrix{T}, vB :: Vector{T}, mC :: Matrix{T}, vD :: Vector{T}, mE :: Matrix{T}, vF :: Vector{T} ) where {T <: AbstractFloat}
 
-    dataDim = size(mP, 1);
+    dataDim = size(mA, 1);
 
     vX = Convex.Variable(dataDim);
-    sConvProb = minimize( T(0.5) * Convex.quadform(vX, mP) + Convex.dot(vQ, vX), [mA * vX == vB, mC * vX <= vD] );
+    sConvProb = minimize( T(0.5) * Convex.quadform(vX, mA) + Convex.dot(vB, vX), [mC * vX == vD, mE * vX <= vF] );
     solve!(sConvProb, ECOS.Optimizer; silent = true);
     
     return vec(vX.value);
@@ -76,34 +75,33 @@ numIterations = 250;
 
 ## Load / Generate Data
 
-mP = randn(oRng, dataDim, dataDim);
-mP = mP' * mP + 0.01 * I;
-mP = 0.5 * (mP + mP');
-vQ = randn(oRng, dataDim);
+mA = randn(oRng, dataDim, dataDim);
+mA = mA' * mA + 0.01 * I;
+mA = 0.5 * (mA + mA');
+vB = randn(oRng, dataDim);
 
-# Equality Constraints
-mA = randn(oRng, numEq, dataDim);
-vB = randn(oRng, numEq);
-# Inequality Constraints
-mC = randn(oRng, numInEq, dataDim);
-vD = randn(oRng, numInEq);
+mC = randn(oRng, numEq, dataDim);
+vD = randn(oRng, numEq);
+
+mE = randn(oRng, numInEq, dataDim);
+vF = randn(oRng, numInEq);
 
 ## Analysis
 
 # Reference Solution
-vXRef = CVXSolver(mP, vQ, mA, vB, mC, vD);
+vXRef = _CVXSolver(mA, vB, mC, vD, mE, vF);
 
 # ProxQP Solution
 
-sProxQP = ProxQP(mP, vQ, mA, vB, mC, vD);
+vX = zeros(dataDim);
+vZ = zeros(numInEq);
 
-dReport = SolveQuadraticProgram!(sProxQP; numIterations = 5_000, ρ = 200.0, σ = 1e-2, adptΡ = true, τ = 10.0);
-# isConv = dReport["Converged"];
-# println(isConv);
+isConv = _SolveQuadraticProgram!(vX, vZ, mA, vB, mC, vD, mE, vF; numIterations = 5_000);
+println(isConv);
 
-println(norm(sProxQP.vX - vXRef));
-println(norm(mA * vXRef - vB, Inf));
-println(norm(max.(mC * vXRef - vD, 0.0), Inf));
+println(norm(vX - vXRef));
+println(norm(mC * vXRef - vD, Inf));
+println(norm(max.(mE * vXRef - vF, 0.0), Inf));
 
 
 ## Display Results
@@ -131,43 +129,4 @@ println(norm(max.(mC * vXRef - vD, 0.0), Inf));
 #     figFileNme = @sprintf("Figure%04d.png", figureIdx);
 #     savefig(hP, figFileNme; width = hP.layout[:width], height = hP.layout[:height]);
 # end
-
-
-# function GenSpdMat( dataDim :: Int ) :: Matrix{Float64}
-
-#     mA = randn(dataDim, dataDim);
-#     mP = mA' * mA + 0.01 * I;
-#     mP = 0.5 * (mP + mP');
-
-#     return mP;
-
-# end
-
-
-# mAA = GenSpdMat(5);
-# mBB = GenSpdMat(5);
-# vBB = rand(5);
-
-# sCA = cholesky(mAA);
-# sCB = cholesky(mBB);
-
-# vT1 = sCB \ vBB;
-# vT2 = sCA \ vBB;
-
-# println(norm(vT1 - vT2));
-
-# cholesky!(mBB);
-
-# copyto!(sCA.U, UpperTriangular(mBB));
-# copyto!(sCA.factors, mBB);
-
-
-# vT1 = sCB \ vBB;
-# vT2 = sCA \ vBB;
-
-# println(norm(vT1 - vT2));
-
-# Benchmamark the SolveQuadraticProgram!()
-
-@btime SolveQuadraticProgram!(sProxQP; numIterations = 5_000, ρ = 200.0, σ = 1e-2, adptΡ = true, τ = 10.0) setup=(sProxQP = ProxQP(mP, vQ, mA, vB, mC, vD));
 
