@@ -169,5 +169,5 @@ println(norm(max.(mC * vXRef - vD, 0.0), Inf));
 
 # Benchmamark the SolveQuadraticProgram!()
 
-@btime SolveQuadraticProgram!(sProxQP; numIterations = 5_000, ρ = 200.0, σ = 1e-2, adptΡ = true, τ = 10.0) setup=(sProxQP = ProxQP(mP, vQ, mA, vB, mC, vD));
+@btime SolveQuadraticProgram!(sProxQP; numIterations = 5_000, ρ = 200.0, σ = 1e-2, adptΡ = true, τ = 10.0) setup = (sProxQP = ProxQP(mP, vQ, mA, vB, mC, vD));
 

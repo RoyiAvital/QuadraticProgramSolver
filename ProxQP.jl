@@ -10,16 +10,15 @@ struct ProxQP{T <: AbstractFloat, MAT <: MatLike{T}, FC <: CholFac{T}, N <: Inte
     mP  :: MAT #<! Quadratic term (SPD Matrix)
     vQ  :: Vector{T} #<! Linear term
     mA  :: MAT #<! Equality constraint matrix
-    mAA :: MAT #<! Gram matrix of equality constraint matrix
     vB  :: Vector{T} #<! Equality constraint vector
     mC  :: MAT #<! Inequality constraint matrix
-    mCC :: MAT #<! Gram matrix of inequality constraint matrix
     vD  :: Vector{T} #<! Inequality constraint vector
     vY  :: Vector{T} #<! Dual variables for equality constraints
     vZ  :: Vector{T} #<! Dual variables for inequality constraints
     vS  :: Vector{T} #<! Slack variables for inequality constraints
-    mK  :: MAT #<! Gram matrix of all constraint matrices `(mAA + mCC)`
+    mK  :: MAT #<! Gram matrix of all constraint matrices `(mA' * mA + mC' * mC)`
     mM  :: MAT #<! Pre factorized matrix for the solver
+    vDi :: Vector{N} #<! Indices of the diagonal elements in `mM` (only for sparse case)
     sC  :: FC #<! Cholesky factorization of mM
     vR  :: Vector{T} #<! Right hand side vector
     vX1 :: Vector{T} #<! Buffer vector `(dataDim, )` for multiplications
@@ -34,7 +33,7 @@ struct ProxQP{T <: AbstractFloat, MAT <: MatLike{T}, FC <: CholFac{T}, N <: Inte
     # σ  :: T        #<! Proximal penalty parameter for the Augmented Lagrangian (Only to set at the end of the optimization loop)
     # ρ¹ :: T        #<! Inverse of ADMM penalty parameter for constraints
 
-    function ProxQP(mP :: AbstractMatrix{T}, vQ :: Vector{T}, mA :: AbstractMatrix{T}, vB :: Vector{T}, mC :: AbstractMatrix{T}, vD :: Vector{T}, vX :: Vector{T}, vY :: Vector{T}, vZ :: Vector{T}, vS :: Vector{T}) where {T <: AbstractFloat}
+    function ProxQP(mP :: MatLike{T}, vQ :: Vector{T}, mA :: MatLike{T}, vB :: Vector{T}, mC :: MatLike{T}, vD :: Vector{T}, vX :: Vector{T}, vY :: Vector{T}, vZ :: Vector{T}, vS :: Vector{T}) where {T <: AbstractFloat}
         dataDim = size(mP, 1);
         numEq   = size(mA, 1);
         numInEq = size(mC, 1);
@@ -43,7 +42,19 @@ struct ProxQP{T <: AbstractFloat, MAT <: MatLike{T}, FC <: CholFac{T}, N <: Inte
         mCC = mC' * mC;
         mCC = T(0.5) * (mCC' + mCC);
         mK = mAA + mCC;
-        mM = mP + mK;
+        mM = mP + mK + I;
+        # Check if `mM` is sparse or dense
+        if isa(mM, SparseMatrixCSC{T, Int})
+            # Align patterns of mP, mK, mM for faster computations
+            mZ = copy(mM);
+            mZ.nzval .= zero(T);
+            #TODO: Seems not to work!!!
+            mK = mK + mZ; #<! Now mK has the same sparsity pattern as mM
+            mP = mP + mZ; #<! Now mP has the same sparsity pattern as mM
+            vDi = GetNzvalDiagIdxs(mM, typeof(dataDim));
+        else
+            vDi = zeros(typeof(dataDim), dataDim);
+        end
         mM = T(0.5) * (mM' + mM);
         sC = cholesky(mM; check = false);
         vR = zeros(T, dataDim);
@@ -53,7 +64,7 @@ struct ProxQP{T <: AbstractFloat, MAT <: MatLike{T}, FC <: CholFac{T}, N <: Inte
         vBb = zeros(T, numEq);
         vDb = zeros(T, numInEq);
 
-        new{T, typeof(mP), typeof(sC), typeof(dataDim)}(vX, mP, vQ, mA, mAA, vB, mC, mCC, vD, vY, vZ, vS, mK, mM, sC, vR, vX1, vX2, vX3, vBb, vDb, dataDim, numEq, numInEq);
+        new{T, typeof(mP), typeof(sC), typeof(dataDim)}(vX, mP, vQ, mA, vB, mC, vD, vY, vZ, vS, mK, mM, vDi, sC, vR, vX1, vX2, vX3, vBb, vDb, dataDim, numEq, numInEq);
     end
 end
 
@@ -155,7 +166,7 @@ function UpdateM!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: A
     # mM = mP + ρ * (mA' * mA) + ρ * (mC' * mC) + σ * I;
     @. sQpProb.mM.nzval = sQpProb.mP.nzval + ρ * sQpProb.mK.nzval;
     # sQpProb.mM += σ * I; #<! σ * I + mM -> mM
-    @inbounds for kk in sQpProb.vDiagIdx
+    @inbounds for kk in sQpProb.vDi
         sQpProb.mM.nzval[kk] += σ;
     end
 end
@@ -298,6 +309,24 @@ function _NormInfDif(vA :: Vector{T}, vB :: Vector{T}, vC :: Vector{T}, vD :: Ve
 
     return valNorm;
 
+end
+
+# Indices into nzval for diagonal entries (requires diagonal to exist in the pattern).
+# Designate N as a type parameter to avoid allocations.
+function GetNzvalDiagIdxs( mA :: SparseMatrixCSC{T, Int}, N :: Type ) where {T <: Number}
+    
+    numElm = min(size(mA, 1), size(mA, 2))
+    vDi    = Vector{N}(undef, numElm);
+
+    @inbounds for jj in 1:numElm
+        lo = mA.colptr[jj];
+        hi = mA.colptr[jj + 1] - 1;
+        rows = @view mA.rowval[lo:hi];
+        k = searchsortedfirst(rows, jj);
+        vDi[jj] = lo + k - 1;
+    end
+
+    return vDi;
 end
 
 
