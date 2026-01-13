@@ -46,11 +46,8 @@ struct ProxQP{T <: AbstractFloat, MAT <: MatLike{T}, FC <: CholFac{T}, N <: Inte
         # Check if `mM` is sparse or dense
         if isa(mM, SparseMatrixCSC{T, Int})
             # Align patterns of mP, mK, mM for faster computations
-            mZ = copy(mM);
-            mZ.nzval .= zero(T);
-            #TODO: Seems not to work!!!
-            mK = mK + mZ; #<! Now mK has the same sparsity pattern as mM
-            mP = mP + mZ; #<! Now mP has the same sparsity pattern as mM
+            mK = AlignSparsePattern(mM, mK); #<! Now mK has the same sparsity pattern as mM (Copy)
+            mP = AlignSparsePattern(mM, mP); #<! Now mP has the same sparsity pattern as mM (Copy)
             vDi = GetNzvalDiagIdxs(mM, typeof(dataDim));
         else
             vDi = zeros(typeof(dataDim), dataDim);
@@ -329,4 +326,25 @@ function GetNzvalDiagIdxs( mA :: SparseMatrixCSC{T, Int}, N :: Type ) where {T <
     return vDi;
 end
 
+function AlignSparsePattern(mT :: SparseMatrixCSC{T, Int}, mA :: SparseMatrixCSC{T, Int}) where {T}
+    # Creates a new sparse matrix `mB` with the same pattern as `mT` and copies values from `mA` where the patterns overlap.
+    # It is assumed that the pattern of `mT` is a superset of the pattern of `mA`.
+    
+    mB = SparseMatrixCSC(mT.m, mT.n, copy(mT.colptr), copy(mT.rowval), zeros(T, length(mT.rowval)));
 
+    @inbounds for jj in 1:mT.n
+        loT = mT.colptr[jj];
+        hiT = mT.colptr[jj + 1] - 1;
+        vRow = @view mT.rowval[loT:hiT];
+
+        for pA in mA.colptr[jj]:(mA.colptr[jj + 1] - 1)
+            ii = mA.rowval[pA];
+            kk = searchsortedfirst(vRow, ii);
+            if (kk <= length(vRow)) && (vRow[kk] == ii)
+                mB.nzval[loT + kk - 1] = mA.nzval[pA];
+            end
+        end
+    end
+
+    return mB;
+end
