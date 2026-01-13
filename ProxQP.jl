@@ -92,6 +92,28 @@ function ProxQP(mP :: Matrix{T}, vQ :: Vector{T}, mA :: Matrix{T}, vB :: Vector{
 
 end
 
+function ProxQP(mP :: SparseMatrixCSC{T, Int}, vQ :: Vector{T}, mA :: SparseMatrixCSC{T, Int}, vB :: Vector{T}, mC :: SparseMatrixCSC{T, Int}, vD :: Vector{T}) where {T <: AbstractFloat}
+    # Initializes the ProxQP problem structure with `vX` and `vZ` as solution to the QP wit only equality constraints
+
+    dataDim = size(mP, 1);
+    numEq   = size(mA, 1);
+    numInEq = size(mC, 1);
+
+    mK = [mP mA'; mA spzeros(T, numEq, numEq)];
+    vR = [-vQ; vB];
+        
+    vK  = mK \ vR;
+    vX = vK[1:dataDim];
+    # vX = zeros(T, dataDim);
+    vY = vK[(dataDim + 1):end];
+    # vY = zeros(T, numEq);
+    vS = max.(vD - mC * vX, zero(T));
+    vZ = zeros(T, numInEq);
+
+    return ProxQP(mP, vQ, mA, vB, mC, vD, vX, vY, vZ, vS);
+
+end
+
 # Solving using ProxQP like approach
 function SolveQuadraticProgram!(sQpProb :: ProxQP{T}; numIterations :: N = 2000, ϵAbs = T(1e-7), ϵRel = T(1e-6), numItrConv :: N = 50, ρ :: T = T(1e2), σ :: T = T(1e-2), adptΡ :: Bool = true, τ :: T = T(10)) where {T <: AbstractFloat, N <: Integer}
     # Solves:
@@ -158,7 +180,7 @@ function UpdateM!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: A
     @views sQpProb.mM[diagind(sQpProb.mM)] .+= σ; #<! TODO: Find non allocating implementation
 end
 
-function UpdateM!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: AbstractFloat, MAT <: SparseMatrixCSC{T, Int}, FC <: Cholesky{T}}
+function UpdateM!(sQpProb :: ProxQP{T, MAT, FC}, ρ :: T, σ :: T) where {T <: AbstractFloat, MAT <: SparseMatrixCSC{T, Int}, FC <: SparseArrays.CHOLMOD.Factor{T, Int}}
     # Updates the pre factorized matrix for the QP problem with no allocations
     # mM = mP + ρ * (mA' * mA) + ρ * (mC' * mC) + σ * I;
     @. sQpProb.mM.nzval = sQpProb.mP.nzval + ρ * sQpProb.mK.nzval;
