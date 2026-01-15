@@ -138,7 +138,7 @@ decFactor   = 50;
 # Model
 diffPow       = 2;
 paramLambda   = 1.95;
-numRefPtsFctr = 0.05;
+numRefPtsFctr = 0.025;
 
 
 ## Load / Generate Data
@@ -156,12 +156,13 @@ mD = GenDiffOp(diffPow, numSamples);
 numRefPts = Int(round(numRefPtsFctr * numSamples));
 vI = sort(randperm(numSamples)[1:numRefPts]); #<! Not efficient
 
-mP = (mD' * mD) + paramLambda * I;
+mP = I + paramLambda * (mD' * mD);
 vQ = -vY;
 
 mA = sparse(1:numRefPts, vI, 1.0, numRefPts, numSamples); #<! Equality Constraints
 vB = vY[vI];
 mC = GenMonoOp(vI, vY); #<! Inequality Constraints
+# mC.nzval .= 0.0; #<! Disable Monotonicity Constraints
 vD = zeros(size(mC, 1));
 
 
@@ -177,36 +178,38 @@ dReport = SolveQuadraticProgram!(sProxQP; numIterations = 5_000, ρ = 200.0, σ 
 isConv = dReport["Converged"];
 println(isConv);
 
-# println(norm(sProxQP.vX - vXRef));
-# println(norm(mA * vXRef - vB, Inf));
-# println(norm(max.(mC * vXRef - vD, 0.0), Inf));
+vX = copy(sProxQP.vX);
+
+println(norm(sProxQP.vX - vXRef));
+println(norm(mA * vXRef - vB, Inf));
+println(norm(max.(mC * vXRef - vD, 0.0), Inf));
 
 
 ## Display Results
 
-# figureIdx += 1;
+figureIdx += 1;
 
-# sTr1 = scatter3d(; x = mP[1, :], y = mP[2, :], z = mP[3, :], mode = "markers", 
-#                marker_size = 7,
-#                name = "Points Set", text = "Points Set");
-# sTr2 = scatter3d(; x = mXi[1, :], y = mXi[2, :], z = mXi[3, :], mode = "markers", 
-#                marker_size = 3,
-#                name = "Optimization Path", text = "Optimization Path");
-# sTr3 = scatter3d(; x = [vPRef[1]], y = [vPRef[2]], z = [vPRef[3]], mode = "markers", 
-#                marker_size = 5,
-#                name = "Optimal Point", text = "Optimal Point");
-# sLayout = Layout(title = "Closest Point", width = 600, height = 600, 
-#                  xaxis_title = "x", yaxis_title = "y",
-#                  hovermode = "closest", margin = attr(l = 50, r = 50, b = 50, t = 50, pad = 0),
-#                  legend = attr(yanchor = "top", y = 0.99, xanchor = "right", x = 0.99));
+sTr1 = scatter(; x = vT, y = vY, mode = "lines", 
+               line_width = 3,
+               name = "Data", text = "Data");
+sTr2 = scatter(; x = vT[vI], y = vY[vI], mode = "markers", 
+               marker_size = 10,
+               name = "Reference Points", text = "Reference Points");
+sTr3 = scatter(; x = vT, y = vXRef, mode = "lines", 
+               line_width = 3,
+               name = "Spline Curve", text = "Spline Curve");
+sLayout = Layout(title = "Spline Piece Wise Monotonic Smooth", width = 600, height = 600, 
+                 xaxis_title = "x", yaxis_title = "y",
+                 hovermode = "closest", margin = attr(l = 50, r = 50, b = 50, t = 50, pad = 0),
+                 legend = attr(yanchor = "top", y = 0.99, xanchor = "right", x = 0.99));
 
-# hP = Plot([sTr1, sTr2, sTr3], sLayout);
-# display(hP);
+hP = Plot([sTr1, sTr2, sTr3], sLayout);
+display(hP);
 
-# if (exportFigures)
-#     figFileNme = @sprintf("Figure%04d.png", figureIdx);
-#     savefig(hP, figFileNme; width = hP.layout[:width], height = hP.layout[:height]);
-# end
+if (exportFigures)
+    figFileNme = @sprintf("Figure%04d.png", figureIdx);
+    savefig(hP, figFileNme; width = hP.layout[:width], height = hP.layout[:height]);
+end
 
 
 # function GenSpdMat( dataDim :: Int ) :: Matrix{Float64}
@@ -277,3 +280,14 @@ println(isConv);
 # vQ = randn(dataDim);
 
 # vX = SolveQuadForm(mP, vQ);
+
+# dataDim = 10;
+
+# mP = sprand(dataDim, dataDim, 0.5);
+# mP = (mP' * mP) + 0.5 * I;
+# mP = 0.5 * (mP + mP');
+# vQ = randn(dataDim);
+# vX = zeros(dataDim);
+
+# sC = cholesky(mP; check = false);
+# ldiv!(vX, sC, vQ);
